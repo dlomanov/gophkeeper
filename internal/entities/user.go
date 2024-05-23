@@ -31,19 +31,26 @@ type (
 	Token string
 )
 
-func NewUser(creds HashCreds) User {
+func NewUser(creds HashCreds) (*User, error) {
+	if !creds.Valid() {
+		return nil, ErrUserCredsInvalid
+	}
 
 	now := time.Now().UTC()
-	return User{
+	return &User{
 		ID:        uuid.New(),
 		HashCreds: creds,
 		CreatedAt: now,
 		UpdatedAt: now,
-	}
+	}, nil
 }
 
 func (c Creds) Valid() bool {
 	return c.Login != "" && c.Pass != ""
+}
+
+func (c HashCreds) Valid() bool {
+	return c.Login != "" && c.PassHash != ""
 }
 
 func (t Token) Valid() bool {

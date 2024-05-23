@@ -9,11 +9,15 @@ import (
 
 func TestNewUser(t *testing.T) {
 	creds := entities.HashCreds{
-		Login:    "testUser",
+		Login:    "",
 		PassHash: "hashedPassword",
 	}
+	user, err := entities.NewUser(creds)
+	require.ErrorIs(t, err, entities.ErrUserCredsInvalid, "error mismatch")
 
-	user := entities.NewUser(creds)
+	creds.Login = "testUser"
+	user, err = entities.NewUser(creds)
+	require.NoError(t, err, "error should be nil")
 	require.NotNil(t, user, "user should not be nil")
 	require.Equal(t, creds, user.HashCreds, "hash creds mismatch")
 	require.NotZero(t, user.ID, "user ID should not be zero")
