@@ -1,12 +1,14 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/dlomanov/gophkeeper/cmd/server/config"
+	"github.com/dlomanov/gophkeeper/internal/apps/server"
+	"log"
 )
 
 func main() {
-	_ = config.Parse()
-	fmt.Println("this is server")
+	c := config.Parse()
+	if err := server.Run(c); err != nil {
+		log.Fatal(err)
+	}
 }

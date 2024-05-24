@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/dlomanov/gophkeeper/cmd/server/config"
+	main2 "github.com/dlomanov/gophkeeper/cmd/server/config"
 )
 
 func main() {
-	_ = config.Parse()
+	_ = main2.Parse()
 	fmt.Println("this is client")
 }

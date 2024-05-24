@@ -4,22 +4,30 @@ import (
 	"embed"
 	"flag"
 	"fmt"
+	"log"
 	"os"
+	"time"
 
 	"github.com/caarlos0/env"
-	"github.com/dlomanov/gophkeeper/internal/apps/server"
+	srvcfg "github.com/dlomanov/gophkeeper/internal/apps/server/config"
 	"gopkg.in/yaml.v2"
 )
 
 type config struct {
-	Address    string `yaml:"address" env:"ADDRESS"`
-	ConfigPath string `yaml:"config,omitempty" env:"CONFIG"`
+	Address        string        `yaml:"address" env:"ADDRESS"`
+	ConfigPath     string        `yaml:"config,omitempty" env:"CONFIG"`
+	DatabaseURI    string        `yaml:"database_uri" env:"DATABASE_URI"`
+	PassHashCost   int           `yaml:"pass_hash_cost" env:"PASS_HASH_COST"`
+	TokenSecretKey string        `yaml:"token_secret_key" env:"TOKEN_SECRET_KEY"`
+	TokenExpires   time.Duration `yaml:"token_expires" env:"TOKEN_EXPIRES"`
+	LogLevel       string        `yaml:"log_level" env:"LOG_LEVEL"`
+	LogType        string        `yaml:"log_type" env:"LOG_TYPE"`
 }
 
 //go:embed config.yaml
 var configFS embed.FS
 
-func Parse() server.Config {
+func Parse() *srvcfg.Config {
 	c := &config{}
 	c.readDefaults()
 	c.readConfig()
@@ -68,10 +76,15 @@ func (c *config) readConfig() {
 }
 
 func (c *config) readFlags() {
-	flag.StringVar(&c.Address, "a", c.Address, "GRPC-server address (shorthand)")
-	flag.StringVar(&c.Address, "address", c.Address, "GRPC-server address")
 	flag.StringVar(&c.ConfigPath, "c", c.ConfigPath, "config path (shorthand)")
 	flag.StringVar(&c.ConfigPath, "config", c.ConfigPath, "config path")
+	flag.StringVar(&c.Address, "address", c.Address, "GRPC-server address")
+	flag.StringVar(&c.DatabaseURI, "database_uri", c.DatabaseURI, "database URI")
+	flag.IntVar(&c.PassHashCost, "pass_hash_cost", c.PassHashCost, "password hash cost")
+	flag.StringVar(&c.TokenSecretKey, "token_secret_key", c.TokenSecretKey, "token secret key")
+	flag.DurationVar(&c.TokenExpires, "token_expires", c.TokenExpires, "token expires")
+	flag.StringVar(&c.LogLevel, "log_level", c.LogLevel, "log level")
+	flag.StringVar(&c.LogType, "log_type", c.LogType, "log type")
 	flag.Parse()
 }
 
@@ -83,6 +96,7 @@ func (c *config) readEnv() {
 }
 
 func (c config) print() {
+	c.TokenSecretKey = "**********"
 	content, err := yaml.Marshal(c)
 	if err != nil {
 		panic(err)
@@ -90,8 +104,18 @@ func (c config) print() {
 	fmt.Println(string(content))
 }
 
-func (c *config) toConfig() server.Config {
-	return server.Config{
-		Address: c.Address,
+func (c *config) toConfig() *srvcfg.Config {
+	res := &srvcfg.Config{
+		Address:        c.Address,
+		DatabaseURI:    c.DatabaseURI,
+		PassHashCost:   c.PassHashCost,
+		TokenSecretKey: c.TokenSecretKey,
+		TokenExpires:   c.TokenExpires,
+		LogLevel:       c.LogLevel,
+		LogType:        c.LogType,
 	}
+	if err := res.Valid(); err != nil {
+		log.Fatal(err)
+	}
+	return res
 }
