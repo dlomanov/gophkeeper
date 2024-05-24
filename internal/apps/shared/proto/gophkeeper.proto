@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/dlomanov/gophkeeper/internal/apps/shared/proto";
+
+
+message SignUpUserRequest {
+  string login = 1;
+  string password = 2;
+}
+
+message SignUpUserResponse {
+  string token = 1;
+}
+
+message SignInUserRequest {
+  string login = 1;
+  string password = 2;
+}
+
+message SignInUserResponse {
+  string token = 1;
+}
+
+service UserService {
+  rpc SignUp (SignUpUserRequest) returns (SignUpUserResponse);
+  rpc SignIn (SignInUserRequest) returns (SignInUserResponse);
+}
+
+
+
