@@ -16,7 +16,7 @@ import (
 type config struct {
 	Address        string        `yaml:"address" env:"ADDRESS"`
 	ConfigPath     string        `yaml:"config,omitempty" env:"CONFIG"`
-	DatabaseURI    string        `yaml:"database_uri" env:"DATABASE_URI"`
+	DatabaseDSN    string        `yaml:"database_dsn" env:"DATABASE_DSN"`
 	PassHashCost   int           `yaml:"pass_hash_cost" env:"PASS_HASH_COST"`
 	TokenSecretKey string        `yaml:"token_secret_key" env:"TOKEN_SECRET_KEY"`
 	TokenExpires   time.Duration `yaml:"token_expires" env:"TOKEN_EXPIRES"`
@@ -79,7 +79,7 @@ func (c *config) readFlags() {
 	flag.StringVar(&c.ConfigPath, "c", c.ConfigPath, "config path (shorthand)")
 	flag.StringVar(&c.ConfigPath, "config", c.ConfigPath, "config path")
 	flag.StringVar(&c.Address, "address", c.Address, "GRPC-server address")
-	flag.StringVar(&c.DatabaseURI, "database_uri", c.DatabaseURI, "database URI")
+	flag.StringVar(&c.DatabaseDSN, "database_dsn", c.DatabaseDSN, "database DSN")
 	flag.IntVar(&c.PassHashCost, "pass_hash_cost", c.PassHashCost, "password hash cost")
 	flag.StringVar(&c.TokenSecretKey, "token_secret_key", c.TokenSecretKey, "token secret key")
 	flag.DurationVar(&c.TokenExpires, "token_expires", c.TokenExpires, "token expires")
@@ -107,7 +107,7 @@ func (c config) print() {
 func (c *config) toConfig() *srvcfg.Config {
 	res := &srvcfg.Config{
 		Address:        c.Address,
-		DatabaseURI:    c.DatabaseURI,
+		DatabaseDSN:    c.DatabaseDSN,
 		PassHashCost:   c.PassHashCost,
 		TokenSecretKey: c.TokenSecretKey,
 		TokenExpires:   c.TokenExpires,

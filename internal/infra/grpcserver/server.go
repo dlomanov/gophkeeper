@@ -13,15 +13,20 @@ const (
 	defaultReadTimeout = 5 * time.Second
 )
 
-type Server struct {
-	addr            string
-	notify          chan error
-	serverOptions   []grpc.ServerOption
-	Server          *grpc.Server
-	shutdownTimeout time.Duration
-}
+type (
+	Server struct {
+		listener        net.Listener
+		addr            string
+		notify          chan error
+		serverOptions   []grpc.ServerOption
+		Server          *grpc.Server
+		shutdownTimeout time.Duration
+	}
+)
 
 func New(opts ...Option) *Server {
+	var err error
+
 	s := &Server{
 		addr:            defaultAddr,
 		shutdownTimeout: defaultReadTimeout,
@@ -32,12 +37,14 @@ func New(opts ...Option) *Server {
 	}
 	s.Server = grpc.NewServer(s.serverOptions...)
 
-	l, err := net.Listen(defaultNetwork, s.addr)
-	if err != nil {
-		s.notify <- err
-		return s
+	if s.listener == nil {
+		s.listener, err = net.Listen(defaultNetwork, s.addr)
+		if err != nil {
+			s.notify <- err
+			return s
+		}
 	}
-	s.start(l)
+	s.start(s.listener)
 
 	return s
 }
@@ -67,6 +74,7 @@ func (s *Server) Shutdown() error {
 	case <-stopped:
 		cancel()
 	}
+	s.listener = nil
 
 	return nil
 }

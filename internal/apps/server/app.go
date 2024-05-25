@@ -10,6 +10,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/infra/logging"
 	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
 	"go.uber.org/zap"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -37,7 +38,7 @@ func Run(ctx context.Context, config *config.Config) error {
 		return err
 	}
 
-	grpcsrv := startGRPC(c)
+	grpcsrv := startGRPC(ctx, c)
 	wait(ctx, c, grpcsrv)
 	shutdownGRPC(c, grpcsrv)
 
@@ -63,12 +64,24 @@ func closeContainer(c *deps.Container) {
 	}
 }
 
-func startGRPC(c *deps.Container) *grpcserver.Server {
-	s := grpcserver.New(
+func startGRPC(ctx context.Context, c *deps.Container) *grpcserver.Server {
+	opts := []grpcserver.Option{
 		grpcserver.Addr(c.Config.Address),
-		grpcserver.ShutdownTimeout(15*time.Second),
+		grpcserver.ShutdownTimeout(15 * time.Second),
 		grpc.GetOptions(c),
-	)
+	}
+
+	if value := ctx.Value(grpcserver.ListenerKey); value != nil {
+		c.Logger.Debug("GRPC-server custom listener detected")
+		if l, ok := value.(net.Listener); ok {
+			opts = append(opts, grpcserver.Listener(l))
+			c.Logger.Debug("GRPC-server starts with custom listener")
+		} else {
+			c.Logger.Debug("GRPC-server custom listener is not net.Listener")
+		}
+	}
+
+	s := grpcserver.New(opts...)
 	grpc.UseServices(s, c)
 	c.Logger.Debug("GRPC-server started")
 	return s

@@ -6,25 +6,20 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
 	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
-	"github.com/docker/go-connections/nat"
+	"github.com/dlomanov/gophkeeper/internal/infra/testing/container"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 )
 
 const (
 	teardownTimeout = 10 * time.Second
-	postgresStartup = 5 * time.Second
 	dsnDefault      = "host=localhost port=5432 user=postgres password=1 dbname=gophkeeper sslmode=disable"
 )
 
@@ -47,7 +42,7 @@ func (s *TestSuit) SetupSuite() {
 	s.teardownCtx, s.teardown = context.WithCancel(context.Background())
 
 	dsn := dsnDefault
-	s.pgc, dsn = runPG(s.T(), dsn)
+	s.pgc, dsn, err = container.RunPostgres(s.teardownCtx, dsn)
 	s.db, err = sqlx.ConnectContext(s.teardownCtx, "pgx", dsn)
 	require.NoError(s.T(), err)
 
@@ -106,67 +101,6 @@ func (s *TestSuit) TestUserRepo() {
 	require.Equal(s.T(), user.HashCreds, user1.HashCreds, "expected same user creds")
 	require.Equal(s.T(), user.CreatedAt.Format("2006-01-02 15:04:05"), user1.CreatedAt.Format("2006-01-02 15:04:05"), "expected same user created at")
 	require.Equal(s.T(), user.UpdatedAt.Format("2006-01-02 15:04:05"), user1.UpdatedAt.Format("2006-01-02 15:04:05"), "expected same user updated at")
-}
-
-// Run postgres container and returns updated DSN with new host and port
-func runPG(t *testing.T, dsn string) (*postgres.PostgresContainer, string) {
-	values := strings.Split(dsn, " ")
-	require.NotEmpty(t, values, "failed to parse database uri")
-	kmap := make(map[int]string, len(values))
-	vmap := make(map[string]string, len(values))
-	for i, v := range values {
-		kv := strings.Split(v, "=")
-		require.Len(t, kv, 2, "failed to parse database uri value")
-		kmap[i] = kv[0]
-		vmap[kv[0]] = kv[1]
-	}
-	port, ok := vmap["port"]
-	require.True(t, ok, "failed to get database port")
-	username, ok := vmap["user"]
-	require.True(t, ok, "failed to get database user")
-	password, ok := vmap["password"]
-	require.True(t, ok, "failed to get database password")
-	dbname, ok := vmap["dbname"]
-	require.True(t, ok, "failed to get database name")
-
-	ctx := context.Background()
-	pgc, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("docker.io/postgres:latest"),
-		postgres.WithDatabase(dbname),
-		postgres.WithUsername(username),
-		postgres.WithPassword(password),
-		postgres.WithInitScripts(),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(postgresStartup),
-		),
-	)
-	require.NoError(t, err, "failed to start postgres container")
-
-	newHost, err := pgc.Host(ctx)
-	require.NoError(t, err, "failed to get postgres container host")
-	newPort, err := pgc.MappedPort(ctx, nat.Port(port))
-	require.NoError(t, err, "failed to get postgres container port")
-	var sb strings.Builder
-	for i := 0; i < len(values); i++ {
-		k := kmap[i]
-
-		_, _ = sb.WriteString(k)
-		_ = sb.WriteByte('=')
-		switch {
-		case k == "host":
-			_, _ = sb.WriteString(newHost)
-		case k == "port":
-			_, _ = sb.WriteString(strconv.Itoa(newPort.Int()))
-		default:
-			_, _ = sb.WriteString(vmap[k])
-		}
-		_ = sb.WriteByte(' ')
-	}
-	dsn = strings.TrimRight(sb.String(), " ")
-
-	return pgc, dsn
 }
 
 func must[T any](t *testing.T, fn func() (T, error)) T {

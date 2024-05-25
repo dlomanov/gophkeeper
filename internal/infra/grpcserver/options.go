@@ -2,10 +2,21 @@ package grpcserver
 
 import (
 	"google.golang.org/grpc"
+	"net"
 	"time"
 )
 
+const (
+	ListenerKey = "grpc_listener"
+)
+
 type Option func(*Server)
+
+func Listener(l net.Listener) Option {
+	return func(s *Server) {
+		s.listener = l
+	}
+}
 
 func Addr(addr string) Option {
 	return func(s *Server) {

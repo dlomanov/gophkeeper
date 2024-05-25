@@ -69,7 +69,7 @@ func (u *UserService) SignIn(ctx context.Context, request *pb.SignInUserRequest)
 	case errors.As(err, &invalid):
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	case errors.As(err, &notFound):
-		return nil, status.Error(codes.NotFound, err.Error())
+		return nil, status.Error(codes.PermissionDenied, err.Error())
 	case err != nil:
 		return nil, status.Error(codes.Internal, err.Error())
 	}

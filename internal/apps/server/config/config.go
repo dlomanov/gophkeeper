@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	Address        string        // GRPC-server address
-	DatabaseURI    string        // Database URI
+	DatabaseDSN    string        // Database DSN
 	PassHashCost   int           // Password hash cost
 	TokenSecretKey string        // Token secret key
 	TokenExpires   time.Duration // Token expires
@@ -20,7 +20,7 @@ func (c Config) Valid() error {
 	if c.Address == "" {
 		errs = append(errs, errors.New("GRPC-server address should be specified"))
 	}
-	if c.DatabaseURI == "" {
+	if c.DatabaseDSN == "" {
 		errs = append(errs, errors.New("database URI should be specified"))
 	}
 	if c.PassHashCost < 0 {

@@ -29,7 +29,7 @@ func NewContainer(
 	logger *zap.Logger,
 	config *config.Config,
 ) (*Container, error) {
-	db, err := sqlx.Connect("pgx", config.DatabaseURI)
+	db, err := sqlx.Connect("pgx", config.DatabaseDSN)
 	if err != nil {
 		logger.Error("failed to connect to database", zap.Error(err))
 		return nil, err
