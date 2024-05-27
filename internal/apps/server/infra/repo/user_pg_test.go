@@ -1,11 +1,13 @@
-package repo
+package repo_test
 
 import (
 	"context"
 	trmsqlx "github.com/avito-tech/go-transaction-manager/drivers/sqlx/v2"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/repo"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
 	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
+	"github.com/dlomanov/gophkeeper/internal/infra/testing/consts"
 	"github.com/dlomanov/gophkeeper/internal/infra/testing/container"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -18,12 +20,7 @@ import (
 	"time"
 )
 
-const (
-	teardownTimeout = 10 * time.Second
-	dsnDefault      = "host=localhost port=5432 user=postgres password=1 dbname=gophkeeper sslmode=disable"
-)
-
-type TestSuit struct {
+type UserTestSuit struct {
 	suite.Suite
 	teardownCtx context.Context
 	logger      *zap.Logger
@@ -32,17 +29,14 @@ type TestSuit struct {
 	teardown    func()
 }
 
-func TestRun(t *testing.T) {
-	suite.Run(t, new(TestSuit))
-}
-
-func (s *TestSuit) SetupSuite() {
+func (s *UserTestSuit) SetupSuite() {
 	var err error
 	s.logger = zaptest.NewLogger(s.T(), zaptest.Level(zap.DebugLevel))
 	s.teardownCtx, s.teardown = context.WithCancel(context.Background())
 
-	dsn := dsnDefault
+	dsn := consts.PostgresDSN
 	s.pgc, dsn, err = container.RunPostgres(s.teardownCtx, dsn)
+	require.NoError(s.T(), err, "no error expected")
 	s.db, err = sqlx.ConnectContext(s.teardownCtx, "pgx", dsn)
 	require.NoError(s.T(), err)
 
@@ -52,28 +46,35 @@ func (s *TestSuit) SetupSuite() {
 	require.NoError(s.T(), err, "no error expected")
 }
 
-func (s *TestSuit) TearDownSuite() {
+func (s *UserTestSuit) TearDownSuite() {
 	s.teardown()
 
 	if err := s.db.Close(); err != nil {
 		s.logger.Error("failed to close postgres db", zap.Error(err))
 	}
 
-	timeout, cancel := context.WithTimeout(context.Background(), teardownTimeout)
+	timeout, cancel := context.WithTimeout(context.Background(), consts.TeardownTimeout)
 	defer cancel()
 	if err := s.pgc.Terminate(timeout); err != nil {
 		s.logger.Error("failed to terminate postgres container", zap.Error(err))
 	}
 }
 
-func (s *TestSuit) TestUserRepo() {
-	repo := NewUserRepo(s.db, trmsqlx.DefaultCtxGetter)
+func TestUserRun(t *testing.T) {
+	suite.Run(t, new(UserTestSuit))
+}
+
+func (s *UserTestSuit) TestUserRepo() {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	r := repo.NewUserRepo(s.db, trmsqlx.DefaultCtxGetter)
 	login := entities.Login("testUser")
 
-	_, err := repo.Get(s.teardownCtx, login)
+	_, err := r.Get(ctx, login)
 	require.ErrorIs(s.T(), err, entities.ErrUserNotFound, "expected user not found error")
 
-	exists, err := repo.Exists(s.teardownCtx, login)
+	exists, err := r.Exists(ctx, login)
 	require.NoError(s.T(), err, "no error expected")
 	require.False(s.T(), exists, "expected user not found")
 
@@ -84,17 +85,17 @@ func (s *TestSuit) TestUserRepo() {
 		})
 	})
 
-	err = repo.Create(s.teardownCtx, *user)
+	err = r.Create(ctx, *user)
 	require.NoError(s.T(), err, "no error expected")
 
-	err = repo.Create(s.teardownCtx, *user)
+	err = r.Create(ctx, *user)
 	require.ErrorIs(s.T(), err, entities.ErrUserExists, "expected user already exists error")
 
-	exists, err = repo.Exists(s.teardownCtx, login)
+	exists, err = r.Exists(ctx, login)
 	require.NoError(s.T(), err, "no error expected")
 	require.True(s.T(), exists, "expected user found")
 
-	user1, err := repo.Get(s.teardownCtx, login)
+	user1, err := r.Get(ctx, login)
 	require.NoError(s.T(), err, "no error expected")
 
 	require.Equal(s.T(), user.ID, user1.ID, "expected same user IDs")

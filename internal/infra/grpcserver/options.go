@@ -7,10 +7,13 @@ import (
 )
 
 const (
-	ListenerKey = "grpc_listener"
+	ListenerKey OptionKey = "grpc_listener"
 )
 
-type Option func(*Server)
+type (
+	Option    func(*Server)
+	OptionKey string
+)
 
 func Listener(l net.Listener) Option {
 	return func(s *Server) {

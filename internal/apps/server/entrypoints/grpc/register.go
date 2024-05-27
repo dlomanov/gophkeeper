@@ -7,10 +7,12 @@ import (
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
 	"github.com/dlomanov/gophkeeper/internal/infra/grpcserver"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func UseServices(s *grpcserver.Server, c *deps.Container) {
 	pb.RegisterUserServiceServer(s.Server, services.NewUserService(c.Logger, c.UserUC))
+	reflection.Register(s.Server)
 }
 
 func GetOptions(c *deps.Container) grpcserver.Option {

@@ -4,17 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dlomanov/gophkeeper/internal/infra/testing/consts"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"strconv"
 	"strings"
-	"time"
-)
-
-const (
-	postgresStartup = 5 * time.Second
 )
 
 // RunPostgres - starts postgres test container and returns updated DSN with new host and port
@@ -59,7 +55,7 @@ func RunPostgres(ctx context.Context, dsn string) (pgc *postgres.PostgresContain
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(postgresStartup),
+				WithStartupTimeout(consts.PostgresStartup),
 		),
 	)
 	if err != nil {

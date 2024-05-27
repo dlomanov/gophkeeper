@@ -18,11 +18,12 @@ import (
 var _ io.Closer = (*Container)(nil)
 
 type Container struct {
-	Logger *zap.Logger
-	Config *config.Config
-	DB     *sqlx.DB
-	Tx     *manager.Manager
-	UserUC *usecases.UserUC
+	Logger  *zap.Logger
+	Config  *config.Config
+	DB      *sqlx.DB
+	Tx      *manager.Manager
+	UserUC  *usecases.UserUC
+	EntryUC *usecases.EntryUC
 }
 
 func NewContainer(
@@ -50,13 +51,15 @@ func NewContainer(
 
 	// usecases
 	userUC := usecases.NewUserUC(logger, userRepo, hasher, tokener)
+	entryUC := usecases.NewEntryUC(logger, repo.NewEntryRepo(db, getter), trm)
 
 	return &Container{
-		Logger: logger,
-		Config: config,
-		DB:     db,
-		Tx:     trm,
-		UserUC: userUC,
+		Logger:  logger,
+		Config:  config,
+		DB:      db,
+		Tx:      trm,
+		UserUC:  userUC,
+		EntryUC: entryUC,
 	}, nil
 }
 
