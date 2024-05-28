@@ -4,6 +4,10 @@ package proto;
 
 option go_package = "github.com/dlomanov/gophkeeper/internal/apps/shared/proto";
 
+service UserService {
+  rpc SignUp (SignUpUserRequest) returns (SignUpUserResponse);
+  rpc SignIn (SignInUserRequest) returns (SignInUserResponse);
+}
 
 message SignUpUserRequest {
   string login = 1;
@@ -23,10 +27,13 @@ message SignInUserResponse {
   string token = 1;
 }
 
-service UserService {
-  rpc SignUp (SignUpUserRequest) returns (SignUpUserResponse);
-  rpc SignIn (SignInUserRequest) returns (SignInUserResponse);
+
+service EntryService {
+  rpc Create (CreateEntryRequest) returns (CreateEntryResponse);
 }
 
+message CreateEntryRequest {
+}
 
-
+message CreateEntryResponse {
+}

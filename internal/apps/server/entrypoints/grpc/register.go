@@ -7,18 +7,17 @@ import (
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
 	"github.com/dlomanov/gophkeeper/internal/infra/grpcserver"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 func UseServices(s *grpcserver.Server, c *deps.Container) {
 	pb.RegisterUserServiceServer(s.Server, services.NewUserService(c.Logger, c.UserUC))
-	reflection.Register(s.Server)
+	pb.RegisterEntryServiceServer(s.Server, services.NewEntryService())
 }
 
 func GetOptions(c *deps.Container) grpcserver.Option {
-	sugar := c.Logger.Sugar()
 	return grpcserver.ServerOptions(grpc.ChainUnaryInterceptor(
-		interceptor.Logger(sugar),
-		interceptor.Recovery(sugar),
+		interceptor.Auth(c.UserUC),
+		interceptor.Logger(c.Logger),
+		interceptor.Recovery(c.Logger),
 	))
 }

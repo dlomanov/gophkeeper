@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"fmt"
 	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -110,4 +111,13 @@ func (uc *UserUC) SignIn(
 	}
 
 	return token, nil
+}
+
+func (uc *UserUC) GetUserID(_ context.Context, token entities.Token) (uuid.UUID, error) {
+	userID, err := uc.tokener.GetUserID(token)
+	if err != nil {
+		uc.logger.Error("failed to get userID from token", zap.Error(err))
+		return uuid.Nil, fmt.Errorf("user_usecase: failed to get userID from token: %w", err)
+	}
+	return userID, nil
 }

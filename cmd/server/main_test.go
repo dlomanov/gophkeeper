@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/dlomanov/gophkeeper/cmd/server/config"
 	"github.com/dlomanov/gophkeeper/internal/apps/server"
+	sharedmd "github.com/dlomanov/gophkeeper/internal/apps/shared/md"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
 	"github.com/dlomanov/gophkeeper/internal/infra/grpcserver"
 	"github.com/dlomanov/gophkeeper/internal/infra/testing/container"
@@ -16,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"net"
@@ -108,7 +110,7 @@ func (s *AppSuite) TestAuth() {
 		Password: "testpassword",
 	})
 	require.Error(s.T(), err, "expected error")
-	require.Equal(s.T(), codes.PermissionDenied, status.Code(err), "expected permission denied error")
+	require.Equal(s.T(), codes.Unauthenticated, status.Code(err), "expected unauthenticated error")
 
 	_, err = userService.SignUp(ctx, &pb.SignUpUserRequest{
 		Login:    "",
@@ -132,6 +134,11 @@ func (s *AppSuite) TestAuth() {
 	require.NoError(s.T(), err, "no error expected")
 	require.NotNil(s.T(), signInResp, "expected response not nil")
 	require.NotEmpty(s.T(), signInResp.Token, "expected token not empty")
+
+	entryService := pb.NewEntryServiceClient(conn)
+	ctx = metadata.AppendToOutgoingContext(ctx, sharedmd.NewTokenKV(signInResp.Token)...)
+	_, err = entryService.Create(ctx, &pb.CreateEntryRequest{})
+	require.NoError(s.T(), err, "expected no error while creating entry")
 }
 
 func (s *AppSuite) createGRPCConn() *grpc.ClientConn {

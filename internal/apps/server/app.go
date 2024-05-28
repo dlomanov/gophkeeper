@@ -96,11 +96,11 @@ func wait(
 	signal.Notify(terminate, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case <-ctx.Done():
-		c.Logger.Info("cached cancellation", zap.Error(ctx.Err()))
+		c.Logger.Info("cached cancellation -> shutdown")
 	case s := <-terminate:
-		c.Logger.Info("cached terminate signal", zap.String("signal", s.String()))
+		c.Logger.Info("cached terminate signal -> shutdown", zap.String("signal", s.String()))
 	case err := <-grpcserv.Notify():
-		c.Logger.Error("GRPC-server notified error", zap.Error(err))
+		c.Logger.Error("GRPC-server notified error -> shutdown", zap.Error(err))
 	}
 }
 
