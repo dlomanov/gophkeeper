@@ -13,56 +13,107 @@ import (
 
 func TestNewEntry(t *testing.T) {
 	tests := []struct {
-		userID  uuid.UUID
-		name    string
-		typ     entities.EntryType
-		data    []byte
-		meta    map[string]string
-		wantErr error
+		testName string
+		key      string
+		userID   uuid.UUID
+		typ      entities.EntryType
+		data     []byte
+		meta     map[string]string
+		wantErrs []error
 	}{
 		{
-			name:    "invalid user ID",
-			typ:     "test",
-			data:    nil,
-			meta:    nil,
-			wantErr: entities.ErrUserIDInvalid,
+			testName: "all invalid",
+			key:      "",
+			userID:   uuid.Nil,
+			typ:      "test",
+			data:     nil,
+			meta:     nil,
+			wantErrs: []error{
+				entities.ErrEntryKeyInvalid,
+				entities.ErrUserIDInvalid,
+				entities.ErrEntryTypeInvalid,
+				entities.ErrEntryDataEmpty,
+			},
 		},
 		{
-			name:    "invalid type",
-			userID:  uuid.New(),
-			typ:     "test",
-			data:    nil,
-			meta:    nil,
-			wantErr: entities.ErrEntryTypeInvalid,
+			testName: "all invalid but key",
+			key:      "key",
+			userID:   uuid.Nil,
+			typ:      "test",
+			data:     nil,
+			meta:     nil,
+			wantErrs: []error{
+				entities.ErrUserIDInvalid,
+				entities.ErrEntryTypeInvalid,
+				entities.ErrEntryDataEmpty,
+			},
 		},
 		{
-			name:    "invalid data",
-			userID:  uuid.New(),
-			typ:     entities.EntryTypePassword,
-			data:    nil,
-			meta:    nil,
-			wantErr: entities.ErrEntryDataEmpty,
+			testName: "all invalid but key, userID",
+			key:      "key",
+			userID:   uuid.New(),
+			typ:      "test",
+			data:     nil,
+			meta:     nil,
+			wantErrs: []error{
+				entities.ErrEntryTypeInvalid,
+				entities.ErrEntryDataEmpty,
+			},
 		},
 		{
-			name:   "valid without metadata",
-			userID: uuid.New(),
-			typ:    entities.EntryTypePassword,
-			data:   []byte("test"),
-			meta:   map[string]string{"test": "test"},
+			testName: "all invalid but key, userID, typ",
+			key:      "key",
+			userID:   uuid.New(),
+			typ:      entities.EntryTypeBinary,
+			data:     nil,
+			meta:     nil,
+			wantErrs: []error{
+				entities.ErrEntryDataEmpty,
+			},
+		},
+		{
+			testName: "almost valid but data size exceeded",
+			key:      "key",
+			userID:   uuid.New(),
+			typ:      entities.EntryTypeBinary,
+			data:     []byte(strings.Repeat("s", entities.EntryMaxDataSize+1)),
+			meta:     nil,
+			wantErrs: []error{entities.ErrEntryDataSizeExceeded},
+		},
+		{
+			testName: "valid without metadata",
+			key:      "key",
+			userID:   uuid.New(),
+			typ:      entities.EntryTypeBinary,
+			data:     []byte("data"),
+			meta:     nil,
+			wantErrs: nil,
+		},
+		{
+			testName: "valid without metadata",
+			key:      "key",
+			userID:   uuid.New(),
+			typ:      entities.EntryTypeBinary,
+			data:     []byte("data"),
+			meta:     map[string]string{"key": "value"},
+			wantErrs: nil,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			entry, err := entities.NewEntry(tt.userID, tt.typ, tt.data)
-			if err != nil {
-				require.ErrorIs(t, err, tt.wantErr, "error mismatch")
-				require.Nil(t, entry, "entry should be nil on error")
+		t.Run(tt.testName, func(t *testing.T) {
+			entry, err := entities.NewEntry(tt.key, tt.userID, tt.typ, tt.data)
+			if len(tt.wantErrs) != 0 {
+				for _, wantErr := range tt.wantErrs {
+					assert.ErrorIs(t, err, wantErr, "unexpected error")
+				}
 				return
 			}
+			require.NoError(t, err, "no error expected")
 			entry.Meta = tt.meta
 
 			require.NotNil(t, entry, "entry should not be nil")
+			assert.Equal(t, tt.key, entry.Key, "key mismatch")
 			assert.Equal(t, tt.typ, entry.Type, "type mismatch")
 			if tt.data == nil {
 				assert.Equal(t, tt.data, entry.Data, "data mismatch")
@@ -77,35 +128,15 @@ func TestNewEntry(t *testing.T) {
 	}
 }
 
-func TestUpdate_nonOptions(t *testing.T) {
-	entry, err := entities.NewEntry(uuid.New(), entities.EntryTypePassword, []byte("test"))
-	require.NoError(t, err, "failed to create entry")
-	err = entry.Update()
-	require.NoError(t, err)
-	assert.Equal(t, entry.CreatedAt, entry.UpdatedAt, "created at should be equal to updated at")
-}
-
 func TestUpdate(t *testing.T) {
 	tests := []struct {
 		name     string
-		typ      entities.EntryType
 		data     []byte
 		meta     map[string]string
 		wantErrs []error
 	}{
 		{
-			name: "invalid type",
-			typ:  "test",
-			data: nil,
-			meta: nil,
-			wantErrs: []error{
-				entities.ErrEntryTypeInvalid,
-				entities.ErrEntryDataEmpty,
-			},
-		},
-		{
 			name: "invalid data",
-			typ:  entities.EntryTypePassword,
 			data: nil,
 			meta: nil,
 			wantErrs: []error{
@@ -114,13 +145,11 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "valid without metadata",
-			typ:  entities.EntryTypePassword,
 			data: []byte("test"),
 			meta: nil,
 		},
 		{
 			name: "valid with metadata",
-			typ:  entities.EntryTypePassword,
 			data: []byte("test"),
 			meta: map[string]string{"test": "test"},
 		},
@@ -129,11 +158,12 @@ func TestUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			now := time.Now().UTC()
+			typ := entities.EntryTypeBinary
 			entry := entities.Entry{
+				Type:      typ,
 				UpdatedAt: now,
 			}
 			errs := entry.Update(
-				entities.UpdateEntryType(tt.typ),
 				entities.UpdateEntryData(tt.data),
 				entities.UpdateEntryMeta(tt.meta))
 			for _, wantErr := range tt.wantErrs {
@@ -143,7 +173,7 @@ func TestUpdate(t *testing.T) {
 			if len(tt.wantErrs) == 0 {
 				require.NoError(t, errs, "error mismatch")
 			}
-			assert.Equal(t, tt.typ, entry.Type, "type mismatch")
+			assert.Equal(t, typ, entry.Type, "type mismatch")
 			assert.Equal(t, tt.data, entry.Data, "data mismatch")
 			assert.True(t, reflect.DeepEqual(tt.meta, entry.Meta), "metadata mismatch")
 			assert.NotEmpty(t, entry.UpdatedAt, "updated at should not be empty")
@@ -152,15 +182,21 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+func TestUpdate_nonOptions(t *testing.T) {
+	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
+	require.NoError(t, err, "failed to create entry")
+	err = entry.Update()
+	require.NoError(t, err)
+	assert.Equal(t, entry.CreatedAt, entry.UpdatedAt, "created at should be equal to updated at")
+}
+
 func TestUpdate_invalidOptions(t *testing.T) {
-	entry, err := entities.NewEntry(uuid.New(), entities.EntryTypePassword, []byte("test"))
+	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
 	require.NoError(t, err, "failed to create entry")
 	errs := entry.Update(
-		entities.UpdateEntryType("test"),
 		entities.UpdateEntryData(nil),
 		entities.UpdateEntryData([]byte(strings.Repeat("s", entities.EntryMaxDataSize+1))),
 	)
-	require.ErrorIs(t, errs, entities.ErrEntryTypeInvalid, "want type invalid error")
 	require.ErrorIs(t, errs, entities.ErrEntryDataEmpty, "want data empty error")
 	require.ErrorIs(t, errs, entities.ErrEntryDataSizeExceeded, "want data size exceeded error")
 }

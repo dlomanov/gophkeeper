@@ -6,9 +6,8 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/repo"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
 	"github.com/dlomanov/gophkeeper/internal/entities"
-	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
-	"github.com/dlomanov/gophkeeper/internal/infra/testing/consts"
-	"github.com/dlomanov/gophkeeper/internal/infra/testing/container"
+	"github.com/dlomanov/gophkeeper/internal/infra/pg/migrator"
+	"github.com/dlomanov/gophkeeper/internal/infra/pg/testcont"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
@@ -34,8 +33,8 @@ func (s *UserTestSuit) SetupSuite() {
 	s.logger = zaptest.NewLogger(s.T(), zaptest.Level(zap.DebugLevel))
 	s.teardownCtx, s.teardown = context.WithCancel(context.Background())
 
-	dsn := consts.PostgresDSN
-	s.pgc, dsn, err = container.RunPostgres(s.teardownCtx, dsn)
+	dsn := testcont.PostgresDSN
+	s.pgc, dsn, err = testcont.RunPostgres(s.teardownCtx, dsn)
 	require.NoError(s.T(), err, "no error expected")
 	s.db, err = sqlx.ConnectContext(s.teardownCtx, "pgx", dsn)
 	require.NoError(s.T(), err)
@@ -53,7 +52,7 @@ func (s *UserTestSuit) TearDownSuite() {
 		s.logger.Error("failed to close postgres db", zap.Error(err))
 	}
 
-	timeout, cancel := context.WithTimeout(context.Background(), consts.TeardownTimeout)
+	timeout, cancel := context.WithTimeout(context.Background(), testcont.TeardownTimeout)
 	defer cancel()
 	if err := s.pgc.Terminate(timeout); err != nil {
 		s.logger.Error("failed to terminate postgres container", zap.Error(err))
@@ -100,8 +99,8 @@ func (s *UserTestSuit) TestUserRepo() {
 
 	require.Equal(s.T(), user.ID, user1.ID, "expected same user IDs")
 	require.Equal(s.T(), user.HashCreds, user1.HashCreds, "expected same user creds")
-	require.Equal(s.T(), user.CreatedAt.Format("2006-01-02 15:04:05"), user1.CreatedAt.Format("2006-01-02 15:04:05"), "expected same user created at")
-	require.Equal(s.T(), user.UpdatedAt.Format("2006-01-02 15:04:05"), user1.UpdatedAt.Format("2006-01-02 15:04:05"), "expected same user updated at")
+	require.Equal(s.T(), user.CreatedAt.Format("2006-01-02 15:04:05.000"), user1.CreatedAt.Format("2006-01-02 15:04:05.000"), "expected same user created at")
+	require.Equal(s.T(), user.UpdatedAt.Format("2006-01-02 15:04:05.000"), user1.UpdatedAt.Format("2006-01-02 15:04:05.000"), "expected same user updated at")
 }
 
 func must[T any](t *testing.T, fn func() (T, error)) T {

@@ -7,7 +7,7 @@ import (
 	sharedmd "github.com/dlomanov/gophkeeper/internal/apps/shared/md"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
 	"github.com/dlomanov/gophkeeper/internal/infra/grpcserver"
-	"github.com/dlomanov/gophkeeper/internal/infra/testing/container"
+	"github.com/dlomanov/gophkeeper/internal/infra/pg/testcont"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -54,7 +54,7 @@ func (s *AppSuite) SetupSuite() {
 	s.listener = bufconn.Listen(bufferSize)
 
 	c := config.Parse()
-	s.pgc, c.DatabaseDSN, err = container.RunPostgres(s.teardownCtx, c.DatabaseDSN)
+	s.pgc, c.DatabaseDSN, err = testcont.RunPostgres(s.teardownCtx, c.DatabaseDSN)
 	require.NoError(s.T(), err, "failed to run postgres container")
 
 	s.serverStoppedCh = make(chan error, 1)

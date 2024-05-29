@@ -3,6 +3,7 @@ package entities
 import "github.com/dlomanov/gophkeeper/internal/core/apperrors"
 
 var (
+	ErrEntryKeyInvalid       = apperrors.NewInvalid("invalid entry key")
 	ErrEntryIsNil            = apperrors.NewInvalid("entry is nil")
 	ErrEntryIDInvalid        = apperrors.NewInvalid("invalid entry ID")
 	ErrEntryTypeInvalid      = apperrors.NewInvalid("invalid entry type")

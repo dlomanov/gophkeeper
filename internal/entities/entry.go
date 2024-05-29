@@ -24,6 +24,7 @@ type (
 	Entry     struct {
 		ID        uuid.UUID
 		UserID    uuid.UUID
+		Key       string
 		Type      EntryType
 		Meta      map[string]string
 		Data      []byte
@@ -41,24 +42,36 @@ func (t EntryType) Valid() bool {
 	return false
 }
 
-func NewEntry(userID uuid.UUID, typ EntryType, data []byte) (*Entry, error) {
+func NewEntry(
+	key string,
+	userID uuid.UUID,
+	typ EntryType,
+	data []byte,
+) (*Entry, error) {
+	var err error
+	if key == "" {
+		err = multierr.Append(err, fmt.Errorf("%w: %s", ErrEntryKeyInvalid, key))
+	}
 	if userID == uuid.Nil {
-		return nil, fmt.Errorf("%w: %s", ErrUserIDInvalid, userID)
+		err = multierr.Append(err, fmt.Errorf("%w: %s", ErrUserIDInvalid, userID))
 	}
 	if !typ.Valid() {
-		return nil, fmt.Errorf("%w: %s", ErrEntryTypeInvalid, typ)
+		err = multierr.Append(err, fmt.Errorf("%w: %s", ErrEntryTypeInvalid, typ))
 	}
 	if data == nil {
-		return nil, fmt.Errorf("%w: data empty", ErrEntryDataEmpty)
+		err = multierr.Append(err, fmt.Errorf("%w: data empty", ErrEntryDataEmpty))
 	}
-
 	if len(data) > EntryMaxDataSize {
-		return nil, fmt.Errorf("%w: data size exceeded: %d", ErrEntryDataSizeExceeded, len(data))
+		err = fmt.Errorf("%w: data size exceeded: %d", ErrEntryDataSizeExceeded, len(data))
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	utcNow := time.Now().UTC()
 	return &Entry{
 		ID:        uuid.New(),
+		Key:       key,
 		UserID:    userID,
 		Type:      typ,
 		Data:      data,
@@ -82,16 +95,6 @@ func (e *Entry) Update(opts ...EntryUpdateOption) error {
 	}
 	e.UpdatedAt = time.Now().UTC()
 	return nil
-}
-
-func UpdateEntryType(typ EntryType) EntryUpdateOption {
-	return func(e *Entry) error {
-		if !typ.Valid() {
-			return fmt.Errorf("%w: %s", ErrEntryTypeInvalid, typ)
-		}
-		e.Type = typ
-		return nil
-	}
 }
 
 func UpdateEntryData(data []byte) EntryUpdateOption {

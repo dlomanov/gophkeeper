@@ -6,9 +6,8 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/repo"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
 	"github.com/dlomanov/gophkeeper/internal/entities"
-	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
-	"github.com/dlomanov/gophkeeper/internal/infra/testing/consts"
-	"github.com/dlomanov/gophkeeper/internal/infra/testing/container"
+	"github.com/dlomanov/gophkeeper/internal/infra/pg/migrator"
+	"github.com/dlomanov/gophkeeper/internal/infra/pg/testcont"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -36,8 +35,8 @@ func (s *EntryTestSuit) SetupSuite() {
 	s.logger = zaptest.NewLogger(s.T(), zaptest.Level(zap.DebugLevel))
 	s.teardownCtx, s.teardown = context.WithCancel(context.Background())
 
-	dsn := consts.PostgresDSN
-	s.pgc, dsn, _ = container.RunPostgres(s.teardownCtx, dsn)
+	dsn := testcont.PostgresDSN
+	s.pgc, dsn, _ = testcont.RunPostgres(s.teardownCtx, dsn)
 	s.db, _ = sqlx.ConnectContext(s.teardownCtx, "pgx", dsn)
 
 	ms, err := migrations.GetMigrations()
@@ -53,7 +52,7 @@ func (s *EntryTestSuit) TearDownSuite() {
 		s.logger.Error("failed to close postgres db", zap.Error(err))
 	}
 
-	timeout, cancel := context.WithTimeout(context.Background(), consts.TeardownTimeout)
+	timeout, cancel := context.WithTimeout(context.Background(), testcont.TeardownTimeout)
 	defer cancel()
 	if err := s.pgc.Terminate(timeout); err != nil {
 		s.logger.Error("failed to terminate postgres container", zap.Error(err))
@@ -85,12 +84,12 @@ func (s *EntryTestSuit) TestEntryRepo() {
 	require.Empty(s.T(), result, "expected empty entries")
 
 	entries := make([]*entities.Entry, 3)
-	entries[0], err = entities.NewEntry(user.ID, entities.EntryTypePassword, []byte("test_data_1"))
+	entries[0], err = entities.NewEntry("key1", user.ID, entities.EntryTypePassword, []byte("test_data_1"))
 	entries[0].Meta = map[string]string{"key1": "value1", "key2": "value2"}
 	require.NoError(s.T(), err, "no error expected when creating entry")
-	entries[1], err = entities.NewEntry(user.ID, entities.EntryTypeBinary, []byte("test_data_2"))
+	entries[1], err = entities.NewEntry("key2", user.ID, entities.EntryTypeBinary, []byte("test_data_2"))
 	require.NoError(s.T(), err, "no error expected when creating entry")
-	entries[2], err = entities.NewEntry(user.ID, entities.EntryTypeNote, []byte("test_data_3"))
+	entries[2], err = entities.NewEntry("key3", user.ID, entities.EntryTypeNote, []byte("test_data_3"))
 	require.NoError(s.T(), err, "no error expected when creating entry")
 	for _, entry := range entries {
 		err = entryRepo.Create(ctx, entry)
@@ -119,6 +118,6 @@ func (s *EntryTestSuit) assertEquals(t *testing.T, expected *entities.Entry, act
 	assert.Equal(t, expected.Type, actual.Type, "expected same entry types")
 	assert.True(t, reflect.DeepEqual(expected.Meta, actual.Meta), "expected same entry meta")
 	assert.Equal(t, expected.Data, actual.Data, "expected same entry data")
-	assert.Equal(t, expected.CreatedAt.Format("2006-01-02 15:04:05"), actual.CreatedAt.Format("2006-01-02 15:04:05"), "expected same entry created at")
-	assert.Equal(t, expected.UpdatedAt.Format("2006-01-02 15:04:05"), actual.UpdatedAt.Format("2006-01-02 15:04:05"), "expected same entry updated at")
+	assert.Equal(t, expected.CreatedAt.Format("2006-01-02 15:04:05.000"), actual.CreatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry created at")
+	assert.Equal(t, expected.UpdatedAt.Format("2006-01-02 15:04:05.000"), actual.UpdatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry updated at")
 }

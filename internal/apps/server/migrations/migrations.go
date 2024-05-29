@@ -2,7 +2,7 @@ package migrations
 
 import (
 	"embed"
-	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
+	"github.com/dlomanov/gophkeeper/internal/infra/pg/migrator"
 )
 
 //go:embed *

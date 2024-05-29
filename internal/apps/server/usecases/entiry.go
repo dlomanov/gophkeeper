@@ -25,37 +25,50 @@ type (
 		Update(ctx context.Context, entry *entities.Entry) error
 		Delete(ctx context.Context, userID uuid.UUID, id uuid.UUID) error
 	}
-	GetRequest struct {
+	GetEntryRequest struct {
 		UserID uuid.UUID
 		ID     uuid.UUID
 	}
-	GetAllRequest struct {
+	GetEntryResponse struct {
+		Entry *entities.Entry
+	}
+	GetEntriesRequest struct {
 		UserID uuid.UUID
 	}
-	CreateRequest struct {
+	GetEntriesResponse struct {
+		Entries []entities.Entry
+	}
+	CreateEntryRequest struct {
+		Key    string
 		UserID uuid.UUID
 		Type   entities.EntryType
 		Meta   map[string]string
 		Data   []byte
 	}
-	CreateResponse struct {
+	CreateEntryResponse struct {
 		ID        uuid.UUID
 		CreatedAt time.Time
+		UpdatedAt time.Time
 	}
-	UpdateRequest struct {
+	UpdateEntryRequest struct {
 		ID     uuid.UUID
 		UserID uuid.UUID
-		Type   entities.EntryType
 		Meta   map[string]string
 		Data   []byte
 	}
-	UpdateResponse struct {
+	UpdateEntryResponse struct {
 		ID        uuid.UUID
+		CreatedAt time.Time
 		UpdatedAt time.Time
 	}
-	DeleteRequest struct {
+	DeleteEntryRequest struct {
 		ID     uuid.UUID
 		UserID uuid.UUID
+	}
+	DeleteEntryResponse struct {
+		ID        uuid.UUID
+		CreatedAt time.Time
+		UpdatedAt time.Time
 	}
 )
 
@@ -73,10 +86,12 @@ func NewEntryUC(
 
 func (uc *EntryUC) Get(
 	ctx context.Context,
-	request GetRequest,
-) (*entities.Entry, error) {
+	request GetEntryRequest,
+) (GetEntryResponse, error) {
+	response := GetEntryResponse{}
+
 	if err := request.validate(); err != nil {
-		return nil, fmt.Errorf("get entry: invalid request: %w", err)
+		return response, fmt.Errorf("get entry: invalid request: %w", err)
 	}
 	userID := request.UserID
 	id := request.ID
@@ -88,24 +103,27 @@ func (uc *EntryUC) Get(
 			zap.String("user_id", userID.String()),
 			zap.String("entry_id", id.String()),
 			zap.Error(err))
-		return nil, err
+		return response, err
 	case err != nil:
 		uc.logger.Error("failed to get entry",
 			zap.String("user_id", userID.String()),
 			zap.String("entry_id", id.String()),
 			zap.Error(err))
-		return nil, err
+		return response, err
 	}
-	return entry, nil
+	response.Entry = entry
+
+	return response, nil
 
 }
 
 func (uc *EntryUC) GetAll(
 	ctx context.Context,
-	request GetAllRequest,
-) ([]entities.Entry, error) {
+	request GetEntriesRequest,
+) (GetEntriesResponse, error) {
+	response := GetEntriesResponse{}
 	if err := request.validate(); err != nil {
-		return nil, fmt.Errorf("get all entries: invalid request: %w", err)
+		return response, fmt.Errorf("get all entries: invalid request: %w", err)
 	}
 	userID := request.UserID
 
@@ -114,52 +132,63 @@ func (uc *EntryUC) GetAll(
 		uc.logger.Error("failed to get entries",
 			zap.String("user_id", userID.String()),
 			zap.Error(err))
-		return nil, err
+		return response, err
 	}
-	return entries, nil
+	response.Entries = entries
+
+	return response, nil
 }
 
 func (uc *EntryUC) Create(
 	ctx context.Context,
-	request CreateRequest,
-) (*CreateResponse, error) {
-	if err := request.validate(); err != nil {
-		return nil, fmt.Errorf("create entry: invalid request: %w", err)
+	request CreateEntryRequest,
+) (resp CreateEntryResponse, err error) {
+	if err = request.validate(); err != nil {
+		return resp, fmt.Errorf("create entry: invalid request: %w", err)
 	}
 	userID := request.UserID
 
-	entry, err := entities.NewEntry(userID, request.Type, request.Data)
+	entry, err := entities.NewEntry(request.Key, userID, request.Type, request.Data)
 	if err != nil {
 		uc.logger.Debug("failed to create entry because of invalid arguments",
 			zap.String("user_id", userID.String()),
 			zap.Error(err))
-		return nil, err
+		return resp, err
 	}
 	entry.Meta = request.Meta
-	if err := uc.entryRepo.Create(ctx, entry); err != nil {
+	err = uc.entryRepo.Create(ctx, entry)
+	switch {
+	case errors.Is(err, entities.ErrEntryExists):
+		uc.logger.Debug("entry already exists",
+			zap.String("user_id", userID.String()),
+			zap.String("entry_key", request.Key),
+			zap.Error(err))
+		return resp, err
+	case err != nil:
 		uc.logger.Error("failed to insert entry to storage",
 			zap.String("user_id", userID.String()),
 			zap.Error(err))
-		return nil, err
+		return resp, err
 	}
-	return &CreateResponse{
-		ID:        entry.ID,
-		CreatedAt: entry.CreatedAt,
-	}, nil
+	resp.ID = entry.ID
+	resp.CreatedAt = entry.CreatedAt
+	resp.UpdatedAt = entry.UpdatedAt
+
+	return resp, nil
 }
 
 func (uc *EntryUC) Update(
 	ctx context.Context,
-	request UpdateRequest,
-) (*UpdateResponse, error) {
-	if err := request.validate(); err != nil {
-		return nil, fmt.Errorf("update entry: invalid request: %w", err)
+	request UpdateEntryRequest,
+) (resp UpdateEntryResponse, err error) {
+	if err = request.validate(); err != nil {
+		return resp, fmt.Errorf("update entry: invalid request: %w", err)
 	}
 	userID := request.UserID
 	id := request.ID
 
 	var entry *entities.Entry
-	err := uc.tx.Do(ctx, func(ctx context.Context) error {
+	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
 		var err error
 		entry, err = uc.entryRepo.Get(ctx, userID, id)
 		switch {
@@ -177,7 +206,6 @@ func (uc *EntryUC) Update(
 			return err
 		}
 		if err := entry.Update(
-			entities.UpdateEntryType(request.Type),
 			entities.UpdateEntryMeta(request.Meta),
 			entities.UpdateEntryData(request.Data)); err != nil {
 			uc.logger.Debug("failed to update entry because of invalid arguments",
@@ -194,51 +222,75 @@ func (uc *EntryUC) Update(
 			return err
 		}
 		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		uc.logger.Error("failed to update entry in storage",
 			zap.String("user_id", userID.String()),
 			zap.String("entry_id", id.String()),
 			zap.Error(err))
-		return nil, err
+		return resp, err
 	}
+	resp.ID = entry.ID
+	resp.CreatedAt = entry.CreatedAt
+	resp.UpdatedAt = entry.UpdatedAt
 
-	return &UpdateResponse{
-		ID:        entry.ID,
-		UpdatedAt: entry.UpdatedAt,
-	}, nil
-
+	return resp, nil
 }
 
 func (uc *EntryUC) Delete(
 	ctx context.Context,
-	request DeleteRequest,
-) error {
-	if err := request.validate(); err != nil {
-		return fmt.Errorf("delete entry: invalid request: %w", err)
+	request DeleteEntryRequest,
+) (resp DeleteEntryResponse, err error) {
+	if err = request.validate(); err != nil {
+		return resp, fmt.Errorf("delete entry: invalid request: %w", err)
 	}
 	userID := request.UserID
 	id := request.ID
 
-	err := uc.entryRepo.Delete(ctx, userID, id)
-	switch {
-	case errors.Is(err, entities.ErrEntryNotFound):
-		uc.logger.Debug("entry not found while deleting",
-			zap.String("user_id", userID.String()),
-			zap.String("entry_id", id.String()),
-			zap.Error(err))
-		return err
-	case err != nil:
-		uc.logger.Error("failed to delete entry from storage",
-			zap.String("user_id", userID.String()),
-			zap.String("entry_id", id.String()),
-			zap.Error(err))
-		return err
+	var entry *entities.Entry
+	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		entry, err = uc.entryRepo.Get(ctx, userID, id)
+		switch {
+		case errors.Is(err, entities.ErrEntryNotFound):
+			uc.logger.Debug("entry not found while deleting",
+				zap.String("user_id", userID.String()),
+				zap.String("entry_id", id.String()),
+				zap.Error(err))
+			return err
+		case err != nil:
+			uc.logger.Error("failed to delete entry from storage",
+				zap.String("user_id", userID.String()),
+				zap.String("entry_id", id.String()),
+				zap.Error(err))
+			return err
+		}
+		err = uc.entryRepo.Delete(ctx, userID, id)
+		switch {
+		case errors.Is(err, entities.ErrEntryNotFound):
+			uc.logger.Debug("entry not found while deleting",
+				zap.String("user_id", userID.String()),
+				zap.String("entry_id", id.String()),
+				zap.Error(err))
+			return err
+		case err != nil:
+			uc.logger.Error("failed to delete entry from storage",
+				zap.String("user_id", userID.String()),
+				zap.String("entry_id", id.String()),
+				zap.Error(err))
+			return err
+		}
+		return nil
+	}); err != nil {
+		return resp, err
 	}
-	return nil
+	resp.ID = entry.ID
+	resp.CreatedAt = entry.CreatedAt
+	resp.UpdatedAt = entry.UpdatedAt
+
+	return resp, nil
 }
 
-func (r GetRequest) validate() error {
+func (r GetEntryRequest) validate() error {
 	var err error
 	if r.UserID == uuid.Nil {
 		err = multierr.Append(err, entities.ErrUserIDInvalid)
@@ -249,28 +301,34 @@ func (r GetRequest) validate() error {
 	return err
 }
 
-func (r GetAllRequest) validate() error {
+func (r GetEntriesRequest) validate() error {
 	if r.UserID == uuid.Nil {
 		return entities.ErrUserIDInvalid
 	}
 	return nil
 }
 
-func (r CreateRequest) validate() error {
+func (r CreateEntryRequest) validate() error {
 	var err error
+	if r.Key == "" {
+		err = multierr.Append(err, entities.ErrEntryKeyInvalid)
+	}
 	if r.UserID == uuid.Nil {
 		err = multierr.Append(err, entities.ErrUserIDInvalid)
 	}
 	if !r.Type.Valid() {
 		err = multierr.Append(err, entities.ErrEntryTypeInvalid)
 	}
-	if r.Data == nil {
+	if len(r.Data) == 0 {
 		err = multierr.Append(err, entities.ErrEntryDataEmpty)
+	}
+	if len(r.Data) > entities.EntryMaxDataSize {
+		err = multierr.Append(err, entities.ErrEntryDataSizeExceeded)
 	}
 	return err
 }
 
-func (r UpdateRequest) validate() error {
+func (r UpdateEntryRequest) validate() error {
 	var err error
 	if r.UserID == uuid.Nil {
 		err = multierr.Append(err, entities.ErrUserIDInvalid)
@@ -278,16 +336,16 @@ func (r UpdateRequest) validate() error {
 	if r.ID == uuid.Nil {
 		err = multierr.Append(err, entities.ErrEntryIDInvalid)
 	}
-	if !r.Type.Valid() {
-		err = multierr.Append(err, entities.ErrEntryTypeInvalid)
-	}
-	if r.Data == nil {
+	if len(r.Data) == 0 {
 		err = multierr.Append(err, entities.ErrEntryDataEmpty)
+	}
+	if len(r.Data) > entities.EntryMaxDataSize {
+		err = multierr.Append(err, entities.ErrEntryDataSizeExceeded)
 	}
 	return err
 }
 
-func (r DeleteRequest) validate() error {
+func (r DeleteEntryRequest) validate() error {
 	var err error
 	if r.UserID == uuid.Nil {
 		err = multierr.Append(err, entities.ErrUserIDInvalid)

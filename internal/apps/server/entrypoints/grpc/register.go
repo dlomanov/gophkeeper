@@ -11,7 +11,7 @@ import (
 
 func UseServices(s *grpcserver.Server, c *deps.Container) {
 	pb.RegisterUserServiceServer(s.Server, services.NewUserService(c.Logger, c.UserUC))
-	pb.RegisterEntryServiceServer(s.Server, services.NewEntryService())
+	pb.RegisterEntryServiceServer(s.Server, services.NewEntryService(c.Logger, c.EntryUC))
 }
 
 func GetOptions(c *deps.Container) grpcserver.Option {

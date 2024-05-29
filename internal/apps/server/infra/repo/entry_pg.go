@@ -21,6 +21,7 @@ type (
 	entryRow struct {
 		ID        uuid.UUID      `db:"id"`
 		UserID    uuid.UUID      `db:"user_id"`
+		Key       string         `db:"key"`
 		Type      string         `db:"type"`
 		Meta      sql.NullString `db:"meta"`
 		Data      []byte         `db:"data"`
@@ -57,7 +58,7 @@ func (r *EntryRepo) Get(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*e
 func (r *EntryRepo) GetAll(ctx context.Context, userID uuid.UUID) ([]entities.Entry, error) {
 	var rows []entryRow
 	err := r.getDB(ctx).SelectContext(ctx, &rows, `
-		SELECT id,user_id, type, meta, data, created_at, updated_at
+		SELECT id, user_id, key, type, meta, data, created_at, updated_at
 		FROM entries
 		WHERE user_id = $1
 		ORDER BY created_at;`, userID)
@@ -76,8 +77,8 @@ func (r *EntryRepo) Create(ctx context.Context, e *entities.Entry) error {
 		return err
 	}
 	result, err := r.getDB(ctx).NamedExecContext(ctx, `
-		INSERT INTO entries (id, user_id, type, meta, data, created_at, updated_at)
-		VALUES (:id, :user_id, :type, :meta, :data, :created_at, :updated_at)
+		INSERT INTO entries (id, user_id, key, type, meta, data, created_at, updated_at)
+		VALUES (:id, :user_id, :key, :type, :meta, :data, :created_at, :updated_at)
 		ON CONFLICT DO NOTHING
 	`, row)
 	if err != nil {
@@ -100,7 +101,9 @@ func (r *EntryRepo) Update(ctx context.Context, e *entities.Entry) error {
 	}
 	result, err := r.getDB(ctx).NamedExecContext(ctx, `
 		UPDATE entries
-		SET type = :type, meta = :meta, data = :data, updated_at = :updated_at
+		SET meta = :meta,
+		    data = :data,
+		    updated_at = :updated_at
 		WHERE id = :id AND user_id = :user_id
 	`, row)
 	if err != nil {
@@ -145,6 +148,7 @@ func (*EntryRepo) toRow(e *entities.Entry) (entryRow, error) {
 	row := entryRow{
 		ID:        e.ID,
 		UserID:    e.UserID,
+		Key:       e.Key,
 		Type:      string(e.Type),
 		Meta:      sql.NullString{},
 		Data:      e.Data,
@@ -179,6 +183,7 @@ func (*EntryRepo) toEntity(row entryRow) (*entities.Entry, error) {
 	entry := &entities.Entry{
 		ID:        row.ID,
 		UserID:    row.UserID,
+		Key:       row.Key,
 		Type:      "",
 		Meta:      nil,
 		Data:      row.Data,

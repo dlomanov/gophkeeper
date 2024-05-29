@@ -1,10 +1,9 @@
-package container
+package testcont
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dlomanov/gophkeeper/internal/infra/testing/consts"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -55,7 +54,7 @@ func RunPostgres(ctx context.Context, dsn string) (pgc *postgres.PostgresContain
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(consts.PostgresStartup),
+				WithStartupTimeout(PostgresStartup),
 		),
 	)
 	if err != nil {
