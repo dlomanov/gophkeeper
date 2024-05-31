@@ -74,3 +74,10 @@ func Auth(tokener Tokener) grpc.UnaryServerInterceptor {
 		return context.WithValue(ctx, UserIDKey, userID), nil
 	})
 }
+
+func GetUserID(ctx context.Context) (uuid.UUID, bool) {
+	if v, ok := ctx.Value(UserIDKey).(uuid.UUID); ok {
+		return v, true
+	}
+	return uuid.Nil, false
+}

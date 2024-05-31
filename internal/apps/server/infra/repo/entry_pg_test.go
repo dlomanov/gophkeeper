@@ -95,6 +95,9 @@ func (s *EntryTestSuit) TestEntryRepo() {
 		err = entryRepo.Create(ctx, entry)
 		require.NoError(s.T(), err, "no error expected when creating entry in storage")
 	}
+	err = entryRepo.Create(ctx, entries[0])
+	require.Error(s.T(), err, "expected entry already exists error")
+	require.ErrorIs(s.T(), err, entities.ErrEntryExists, "expected entry already exists error")
 
 	result, err = entryRepo.GetAll(ctx, user.ID)
 	require.NoError(s.T(), err, "no error expected when getting entries")

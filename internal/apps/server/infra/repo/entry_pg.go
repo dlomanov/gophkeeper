@@ -43,7 +43,7 @@ func NewEntryRepo(
 func (r *EntryRepo) Get(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entities.Entry, error) {
 	row := entryRow{}
 	err := r.getDB(ctx).GetContext(ctx, &row, `
-		SELECT id,user_id, type, meta, data, created_at, updated_at
+		SELECT id, user_id, key, type, meta, data, created_at, updated_at
 		FROM entries
 		WHERE id = $1 AND user_id = $2;`, id, userID)
 	switch {

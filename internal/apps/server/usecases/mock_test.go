@@ -116,6 +116,11 @@ func (r *MockEntryRepo) Create(_ context.Context, entry *entities.Entry) error {
 	if _, ok := r.storage[key]; ok {
 		return entities.ErrEntryExists
 	}
+	for _, v := range r.storage {
+		if v.Key == entry.Key {
+			return entities.ErrEntryExists
+		}
+	}
 	r.storage[key] = *entry
 	return nil
 }

@@ -117,7 +117,7 @@ func (uc *EntryUC) Get(
 
 }
 
-func (uc *EntryUC) GetAll(
+func (uc *EntryUC) GetEntries(
 	ctx context.Context,
 	request GetEntriesRequest,
 ) (GetEntriesResponse, error) {

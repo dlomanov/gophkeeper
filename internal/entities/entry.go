@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	EntryTypePassword EntryType = "password"
-	EntryTypeNote     EntryType = "note"
-	EntryTypeCard     EntryType = "card"
-	EntryTypeBinary   EntryType = "binary"
+	EntryTypeUnspecified EntryType = ""
+	EntryTypePassword    EntryType = "password"
+	EntryTypeNote        EntryType = "note"
+	EntryTypeCard        EntryType = "card"
+	EntryTypeBinary      EntryType = "binary"
 )
 
 const (

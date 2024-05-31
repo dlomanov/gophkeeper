@@ -23,7 +23,7 @@ func TestEntryUC(t *testing.T) {
 	userID1 := uuid.New()
 	userID2 := uuid.New()
 
-	getAll, err := sut.GetAll(ctx, usecases.GetEntriesRequest{UserID: userID1})
+	getAll, err := sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	require.Empty(t, getAll.Entries, "expected empty list")
 
@@ -51,7 +51,15 @@ func TestEntryUC(t *testing.T) {
 		entries[i].CreatedAt = create.CreatedAt
 		entries[i].UpdatedAt = create.UpdatedAt
 	}
-	getAll, err = sut.GetAll(ctx, usecases.GetEntriesRequest{UserID: userID1})
+	_, err = sut.Create(ctx, usecases.CreateEntryRequest{
+		Key:    entries[0].Key,
+		UserID: userID1,
+		Type:   entities.EntryTypeNote,
+		Meta:   map[string]string{"description": "test_note_4"},
+		Data:   []byte("test_data_4"),
+	})
+	require.ErrorIs(t, err, entities.ErrEntryExists, "expected entry exists error")
+	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
 	for i, entry := range getAll.Entries {
@@ -83,7 +91,7 @@ func TestEntryUC(t *testing.T) {
 	assert.Equal(t, del.CreatedAt.Format("2006-01-02 15:04:05.000"), getAll.Entries[0].CreatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry created at")
 	assert.Equal(t, del.UpdatedAt.Format("2006-01-02 15:04:05.000"), getAll.Entries[0].UpdatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry updated at")
 	entries = entries[1:]
-	getAll, err = sut.GetAll(ctx, usecases.GetEntriesRequest{UserID: userID1})
+	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
 	for i, entry := range getAll.Entries {
@@ -128,7 +136,7 @@ func TestEntryUC_validation(t *testing.T) {
 
 	largeData := []byte(strings.Repeat("s", entities.EntryMaxDataSize+1))
 
-	_, err := sut.GetAll(ctx, usecases.GetEntriesRequest{UserID: uuid.Nil})
+	_, err := sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: uuid.Nil})
 	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
 
 	_, err = sut.Get(ctx, usecases.GetEntryRequest{ID: uuid.Nil, UserID: uuid.Nil})

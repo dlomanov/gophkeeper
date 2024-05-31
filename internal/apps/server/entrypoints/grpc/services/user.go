@@ -49,7 +49,7 @@ func (s *UserService) SignUp(ctx context.Context, request *pb.SignUpUserRequest)
 	case errors.As(err, &invalid):
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	case err != nil:
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Error(codes.Internal, "internal server error")
 	}
 
 	return &pb.SignUpUserResponse{Token: string(token)}, nil
@@ -75,7 +75,7 @@ func (s *UserService) SignIn(ctx context.Context, request *pb.SignInUserRequest)
 	case errors.As(err, &notFound):
 		return nil, status.Error(codes.Unauthenticated, err.Error())
 	case err != nil:
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Error(codes.Internal, "internal server error")
 	}
 
 	return &pb.SignInUserResponse{Token: string(token)}, nil

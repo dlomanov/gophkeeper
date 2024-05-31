@@ -146,14 +146,22 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	EntryService_Get_FullMethodName    = "/proto.EntryService/Get"
+	EntryService_GetAll_FullMethodName = "/proto.EntryService/GetEntries"
 	EntryService_Create_FullMethodName = "/proto.EntryService/Create"
+	EntryService_Update_FullMethodName = "/proto.EntryService/Update"
+	EntryService_Delete_FullMethodName = "/proto.EntryService/Delete"
 )
 
 // EntryServiceClient is the client API for EntryService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EntryServiceClient interface {
+	Get(ctx context.Context, in *GetEntryRequest, opts ...grpc.CallOption) (*GetEntryResponse, error)
+	GetAll(ctx context.Context, in *GetAllEntriesRequest, opts ...grpc.CallOption) (*GetAllEntriesResponse, error)
 	Create(ctx context.Context, in *CreateEntryRequest, opts ...grpc.CallOption) (*CreateEntryResponse, error)
+	Update(ctx context.Context, in *UpdateEntryRequest, opts ...grpc.CallOption) (*UpdateEntryResponse, error)
+	Delete(ctx context.Context, in *DeleteEntryRequest, opts ...grpc.CallOption) (*DeleteEntryResponse, error)
 }
 
 type entryServiceClient struct {
@@ -162,6 +170,24 @@ type entryServiceClient struct {
 
 func NewEntryServiceClient(cc grpc.ClientConnInterface) EntryServiceClient {
 	return &entryServiceClient{cc}
+}
+
+func (c *entryServiceClient) Get(ctx context.Context, in *GetEntryRequest, opts ...grpc.CallOption) (*GetEntryResponse, error) {
+	out := new(GetEntryResponse)
+	err := c.cc.Invoke(ctx, EntryService_Get_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *entryServiceClient) GetAll(ctx context.Context, in *GetAllEntriesRequest, opts ...grpc.CallOption) (*GetAllEntriesResponse, error) {
+	out := new(GetAllEntriesResponse)
+	err := c.cc.Invoke(ctx, EntryService_GetAll_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *entryServiceClient) Create(ctx context.Context, in *CreateEntryRequest, opts ...grpc.CallOption) (*CreateEntryResponse, error) {
@@ -173,11 +199,33 @@ func (c *entryServiceClient) Create(ctx context.Context, in *CreateEntryRequest,
 	return out, nil
 }
 
+func (c *entryServiceClient) Update(ctx context.Context, in *UpdateEntryRequest, opts ...grpc.CallOption) (*UpdateEntryResponse, error) {
+	out := new(UpdateEntryResponse)
+	err := c.cc.Invoke(ctx, EntryService_Update_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *entryServiceClient) Delete(ctx context.Context, in *DeleteEntryRequest, opts ...grpc.CallOption) (*DeleteEntryResponse, error) {
+	out := new(DeleteEntryResponse)
+	err := c.cc.Invoke(ctx, EntryService_Delete_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EntryServiceServer is the server API for EntryService service.
 // All implementations must embed UnimplementedEntryServiceServer
 // for forward compatibility
 type EntryServiceServer interface {
+	Get(context.Context, *GetEntryRequest) (*GetEntryResponse, error)
+	GetAll(context.Context, *GetAllEntriesRequest) (*GetAllEntriesResponse, error)
 	Create(context.Context, *CreateEntryRequest) (*CreateEntryResponse, error)
+	Update(context.Context, *UpdateEntryRequest) (*UpdateEntryResponse, error)
+	Delete(context.Context, *DeleteEntryRequest) (*DeleteEntryResponse, error)
 	mustEmbedUnimplementedEntryServiceServer()
 }
 
@@ -185,8 +233,20 @@ type EntryServiceServer interface {
 type UnimplementedEntryServiceServer struct {
 }
 
+func (UnimplementedEntryServiceServer) Get(context.Context, *GetEntryRequest) (*GetEntryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedEntryServiceServer) GetAll(context.Context, *GetAllEntriesRequest) (*GetAllEntriesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetEntries not implemented")
+}
 func (UnimplementedEntryServiceServer) Create(context.Context, *CreateEntryRequest) (*CreateEntryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (UnimplementedEntryServiceServer) Update(context.Context, *UpdateEntryRequest) (*UpdateEntryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+}
+func (UnimplementedEntryServiceServer) Delete(context.Context, *DeleteEntryRequest) (*DeleteEntryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedEntryServiceServer) mustEmbedUnimplementedEntryServiceServer() {}
 
@@ -199,6 +259,42 @@ type UnsafeEntryServiceServer interface {
 
 func RegisterEntryServiceServer(s grpc.ServiceRegistrar, srv EntryServiceServer) {
 	s.RegisterService(&EntryService_ServiceDesc, srv)
+}
+
+func _EntryService_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EntryServiceServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EntryService_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EntryServiceServer).Get(ctx, req.(*GetEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EntryService_GetAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllEntriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EntryServiceServer).GetAll(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EntryService_GetAll_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EntryServiceServer).GetAll(ctx, req.(*GetAllEntriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _EntryService_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -219,6 +315,42 @@ func _EntryService_Create_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EntryService_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EntryServiceServer).Update(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EntryService_Update_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EntryServiceServer).Update(ctx, req.(*UpdateEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EntryService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EntryServiceServer).Delete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EntryService_Delete_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EntryServiceServer).Delete(ctx, req.(*DeleteEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EntryService_ServiceDesc is the grpc.ServiceDesc for EntryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -227,8 +359,24 @@ var EntryService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*EntryServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "Get",
+			Handler:    _EntryService_Get_Handler,
+		},
+		{
+			MethodName: "GetEntries",
+			Handler:    _EntryService_GetAll_Handler,
+		},
+		{
 			MethodName: "Create",
 			Handler:    _EntryService_Create_Handler,
+		},
+		{
+			MethodName: "Update",
+			Handler:    _EntryService_Update_Handler,
+		},
+		{
+			MethodName: "Delete",
+			Handler:    _EntryService_Delete_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
