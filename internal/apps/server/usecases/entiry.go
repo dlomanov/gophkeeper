@@ -16,6 +16,7 @@ type (
 	EntryUC struct {
 		logger    *zap.Logger
 		entryRepo EntryRepo
+		encrypter Encrypter
 		tx        trm.Manager
 	}
 	EntryRepo interface {
@@ -24,6 +25,10 @@ type (
 		Create(ctx context.Context, entry *entities.Entry) error
 		Update(ctx context.Context, entry *entities.Entry) error
 		Delete(ctx context.Context, userID uuid.UUID, id uuid.UUID) error
+	}
+	Encrypter interface {
+		Encrypt(data []byte) ([]byte, error)
+		Decrypt(data []byte) ([]byte, error)
 	}
 	GetEntryRequest struct {
 		UserID uuid.UUID
@@ -75,11 +80,13 @@ type (
 func NewEntryUC(
 	logger *zap.Logger,
 	entryRepo EntryRepo,
+	encrypter Encrypter,
 	tx trm.Manager,
 ) *EntryUC {
 	return &EntryUC{
 		logger:    logger,
 		entryRepo: entryRepo,
+		encrypter: encrypter,
 		tx:        tx,
 	}
 }
@@ -87,9 +94,7 @@ func NewEntryUC(
 func (uc *EntryUC) Get(
 	ctx context.Context,
 	request GetEntryRequest,
-) (GetEntryResponse, error) {
-	response := GetEntryResponse{}
-
+) (response GetEntryResponse, err error) {
 	if err := request.validate(); err != nil {
 		return response, fmt.Errorf("get entry: invalid request: %w", err)
 	}
@@ -111,10 +116,18 @@ func (uc *EntryUC) Get(
 			zap.Error(err))
 		return response, err
 	}
+	decrypted, err := uc.encrypter.Decrypt(entry.Data)
+	if err != nil {
+		uc.logger.Error("failed to decrypt entry",
+			zap.String("user_id", userID.String()),
+			zap.String("entry_id", id.String()),
+			zap.Error(err))
+		return response, fmt.Errorf("get entry: failed to decrypt entry: %w", err)
+	}
+	entry.Data = decrypted
 	response.Entry = entry
 
 	return response, nil
-
 }
 
 func (uc *EntryUC) GetEntries(
@@ -134,6 +147,16 @@ func (uc *EntryUC) GetEntries(
 			zap.Error(err))
 		return response, err
 	}
+	for i := range entries {
+		decrypted, err := uc.encrypter.Decrypt(entries[i].Data)
+		if err != nil {
+			uc.logger.Error("failed to decrypt entry",
+				zap.String("user_id", userID.String()),
+				zap.Error(err))
+			return response, fmt.Errorf("get all entries: failed to decrypt entry: %w", err)
+		}
+		entries[i].Data = decrypted
+	}
 	response.Entries = entries
 
 	return response, nil
@@ -148,7 +171,14 @@ func (uc *EntryUC) Create(
 	}
 	userID := request.UserID
 
-	entry, err := entities.NewEntry(request.Key, userID, request.Type, request.Data)
+	encrypted, err := uc.encrypter.Encrypt(request.Data)
+	if err != nil {
+		uc.logger.Error("failed to encrypt entry",
+			zap.String("user_id", userID.String()),
+			zap.Error(err))
+		return resp, fmt.Errorf("create entry: failed to encrypt entry: %w", err)
+	}
+	entry, err := entities.NewEntry(request.Key, userID, request.Type, encrypted)
 	if err != nil {
 		uc.logger.Debug("failed to create entry because of invalid arguments",
 			zap.String("user_id", userID.String()),
@@ -187,6 +217,13 @@ func (uc *EntryUC) Update(
 	userID := request.UserID
 	id := request.ID
 
+	encrypted, err := uc.encrypter.Encrypt(request.Data)
+	if err != nil {
+		uc.logger.Error("failed to encrypt entry",
+			zap.String("user_id", userID.String()),
+			zap.Error(err))
+		return resp, fmt.Errorf("update entry: failed to encrypt entry: %w", err)
+	}
 	var entry *entities.Entry
 	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
 		var err error
@@ -207,7 +244,7 @@ func (uc *EntryUC) Update(
 		}
 		if err := entry.Update(
 			entities.UpdateEntryMeta(request.Meta),
-			entities.UpdateEntryData(request.Data)); err != nil {
+			entities.UpdateEntryData(encrypted)); err != nil {
 			uc.logger.Debug("failed to update entry because of invalid arguments",
 				zap.String("user_id", userID.String()),
 				zap.String("entry_id", id.String()),

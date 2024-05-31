@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/config"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entrypoints/grpc"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/deps"
@@ -18,6 +19,10 @@ import (
 )
 
 func Run(ctx context.Context, config *config.Config) error {
+	if err := config.Valid(); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
+
 	var (
 		logger *zap.Logger
 		c      *deps.Container

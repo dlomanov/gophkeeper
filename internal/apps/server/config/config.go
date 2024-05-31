@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"github.com/dlomanov/gophkeeper/internal/infra/encrypto"
 	"time"
 )
 
@@ -9,10 +10,11 @@ type Config struct {
 	Address        string        // GRPC-server address
 	DatabaseDSN    string        // Database DSN
 	PassHashCost   int           // Password hash cost
-	TokenSecretKey string        // Token secret key
+	TokenSecretKey []byte        // Token secret key
 	TokenExpires   time.Duration // Token expires
 	LogLevel       string        // Log level
 	LogType        string        // Log type
+	DataSecretKey  []byte        // Data secret key
 }
 
 func (c Config) Valid() error {
@@ -26,7 +28,7 @@ func (c Config) Valid() error {
 	if c.PassHashCost < 0 {
 		errs = append(errs, errors.New("password hash cost should not be negative"))
 	}
-	if c.TokenSecretKey == "" {
+	if len(c.TokenSecretKey) == 0 {
 		errs = append(errs, errors.New("token secret key should be specified"))
 	}
 	if c.TokenExpires <= 0 {
@@ -37,6 +39,9 @@ func (c Config) Valid() error {
 	}
 	if c.LogType == "" {
 		errs = append(errs, errors.New("log type should be specified"))
+	}
+	if !encrypto.KeyValid(c.DataSecretKey) {
+		errs = append(errs, errors.New("data secret key should be specified"))
 	}
 	return errors.Join(errs...)
 }

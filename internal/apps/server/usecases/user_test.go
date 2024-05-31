@@ -144,7 +144,7 @@ func TestUserUC(t *testing.T) {
 		},
 	}
 
-	tokener := token.NewJWT([]byte("test"), time.Minute)
+	tokener := token.NewJWT([]byte("testsecret"), time.Minute)
 	uc := usecases.NewUserUC(
 		zaptest.NewLogger(t),
 		NewMockUserRepo(),

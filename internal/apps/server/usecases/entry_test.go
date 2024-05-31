@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
 	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/infra/encrypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,9 +17,12 @@ import (
 
 func TestEntryUC(t *testing.T) {
 	ctx := context.Background()
+	enc, err := encrypto.NewEncrypter([]byte("1234567890123456"))
+	require.NoError(t, err, "no error expected")
 	sut := usecases.NewEntryUC(
 		zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel)),
 		NewMockEntryRepo(),
+		enc,
 		NewMockTrmManager())
 	userID1 := uuid.New()
 	userID2 := uuid.New()
@@ -129,14 +133,17 @@ func TestEntryUC(t *testing.T) {
 
 func TestEntryUC_validation(t *testing.T) {
 	ctx := context.Background()
+	enc, err := encrypto.NewEncrypter([]byte("1234567890123456"))
+	require.NoError(t, err, "no error expected")
 	sut := usecases.NewEntryUC(
 		zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel)),
 		NewMockEntryRepo(),
+		enc,
 		NewMockTrmManager())
 
 	largeData := []byte(strings.Repeat("s", entities.EntryMaxDataSize+1))
 
-	_, err := sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: uuid.Nil})
+	_, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: uuid.Nil})
 	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
 
 	_, err = sut.Get(ctx, usecases.GetEntryRequest{ID: uuid.Nil, UserID: uuid.Nil})

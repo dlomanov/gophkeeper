@@ -4,7 +4,6 @@ import (
 	"embed"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -22,6 +21,7 @@ type config struct {
 	TokenExpires   time.Duration `yaml:"token_expires" env:"TOKEN_EXPIRES"`
 	LogLevel       string        `yaml:"log_level" env:"LOG_LEVEL"`
 	LogType        string        `yaml:"log_type" env:"LOG_TYPE"`
+	DataSecretKey  string        `yaml:"data_secret_key" env:"DATA_SECRET_KEY"`
 }
 
 //go:embed config.yaml
@@ -85,6 +85,7 @@ func (c *config) readFlags() {
 	flag.DurationVar(&c.TokenExpires, "token_expires", c.TokenExpires, "token expires")
 	flag.StringVar(&c.LogLevel, "log_level", c.LogLevel, "log level")
 	flag.StringVar(&c.LogType, "log_type", c.LogType, "log type")
+	flag.StringVar(&c.DataSecretKey, "data_secret_key", c.DataSecretKey, "data secret key")
 	flag.Parse()
 }
 
@@ -97,6 +98,7 @@ func (c *config) readEnv() {
 
 func (c config) print() {
 	c.TokenSecretKey = "**********"
+	c.DataSecretKey = "**********"
 	content, err := yaml.Marshal(c)
 	if err != nil {
 		panic(err)
@@ -109,13 +111,11 @@ func (c *config) toConfig() *srvcfg.Config {
 		Address:        c.Address,
 		DatabaseDSN:    c.DatabaseDSN,
 		PassHashCost:   c.PassHashCost,
-		TokenSecretKey: c.TokenSecretKey,
+		TokenSecretKey: []byte(c.TokenSecretKey),
 		TokenExpires:   c.TokenExpires,
 		LogLevel:       c.LogLevel,
 		LogType:        c.LogType,
-	}
-	if err := res.Valid(); err != nil {
-		log.Fatal(err)
+		DataSecretKey:  []byte(c.DataSecretKey),
 	}
 	return res
 }

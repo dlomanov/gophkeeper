@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"context"
+	"crypto/rand"
 	"github.com/dlomanov/gophkeeper/cmd/server/config"
 	"github.com/dlomanov/gophkeeper/internal/apps/server"
 	sharedmd "github.com/dlomanov/gophkeeper/internal/apps/shared/md"
@@ -21,6 +22,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
+	"io"
 	"net"
 	"reflect"
 	"testing"
@@ -56,6 +58,8 @@ func (s *AppSuite) SetupSuite() {
 	s.listener = bufconn.Listen(bufferSize)
 
 	c := config.Parse()
+	c.TokenSecretKey = s.generateKey()
+	c.DataSecretKey = s.generateKey()
 	s.pgc, c.DatabaseDSN, err = testcont.RunPostgres(s.teardownCtx, c.DatabaseDSN)
 	require.NoError(s.T(), err, "failed to run postgres container")
 
@@ -253,4 +257,11 @@ func (s *AppSuite) createGRPCConn() *grpc.ClientConn {
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(s.T(), err)
 	return conn
+}
+
+func (s *AppSuite) generateKey() []byte {
+	key := make([]byte, 16)
+	_, err := io.ReadFull(rand.Reader, key)
+	require.NoError(s.T(), err, "no error expected")
+	return key
 }

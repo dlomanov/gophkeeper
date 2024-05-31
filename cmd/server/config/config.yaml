@@ -1,7 +1,8 @@
 address: ":9090"
 database_dsn: "host=localhost port=5432 user=postgres password=1 dbname=gophkeeper sslmode=disable"
 pass_hash_cost: 5
-token_secret_key: "secret"
+token_secret_key: ""
 token_expires: "15m"
 log_level: "debug"
 log_type: "development"
+data_secret_key: ""

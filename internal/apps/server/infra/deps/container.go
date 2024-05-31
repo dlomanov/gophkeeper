@@ -2,6 +2,7 @@ package deps
 
 import (
 	"errors"
+	"fmt"
 	trmsqlx "github.com/avito-tech/go-transaction-manager/drivers/sqlx/v2"
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/config"
@@ -9,6 +10,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/pass"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/token"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
+	"github.com/dlomanov/gophkeeper/internal/infra/encrypto"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
@@ -32,7 +34,7 @@ func NewContainer(
 ) (*Container, error) {
 	db, err := sqlx.Connect("pgx", config.DatabaseDSN)
 	if err != nil {
-		logger.Error("failed to connect to database", zap.Error(err))
+		logger.Error("container: failed to connect to database", zap.Error(err))
 		return nil, err
 	}
 
@@ -47,11 +49,19 @@ func NewContainer(
 
 	// services
 	hasher := pass.NewHasher(config.PassHashCost)
-	tokener := token.NewJWT([]byte(config.TokenSecretKey), config.TokenExpires)
+	tokener := token.NewJWT(config.TokenSecretKey, config.TokenExpires)
+	encrypter, err := encrypto.NewEncrypter(config.DataSecretKey)
+	if err != nil {
+		return nil, fmt.Errorf("container: failed to create encrypter: %w", err)
+	}
 
 	// usecases
 	userUC := usecases.NewUserUC(logger, userRepo, hasher, tokener)
-	entryUC := usecases.NewEntryUC(logger, repo.NewEntryRepo(db, getter), trm)
+	entryUC := usecases.NewEntryUC(
+		logger,
+		repo.NewEntryRepo(db, getter),
+		encrypter,
+		trm)
 
 	return &Container{
 		Logger:  logger,
