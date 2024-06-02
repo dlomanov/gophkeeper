@@ -4,6 +4,7 @@ import (
 	"embed"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -22,6 +23,8 @@ type config struct {
 	LogLevel       string        `yaml:"log_level" env:"LOG_LEVEL"`
 	LogType        string        `yaml:"log_type" env:"LOG_TYPE"`
 	DataSecretKey  string        `yaml:"data_secret_key" env:"DATA_SECRET_KEY"`
+	CertPath       string        `yaml:"cert_path" env:"CERT_PATH"`
+	CertKeyPath    string        `yaml:"cert_key_path" env:"CERT_KEY_PATH"`
 }
 
 //go:embed config.yaml
@@ -40,10 +43,10 @@ func Parse() *srvcfg.Config {
 func (c *config) readDefaults() {
 	content, err := configFS.ReadFile("config.yaml")
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to read default config: %v", err)
 	}
 	if err := yaml.Unmarshal(content, c); err != nil {
-		panic(err)
+		log.Fatalf("failed to unmarshal default config: %v", err)
 	}
 }
 
@@ -67,11 +70,11 @@ func (c *config) readConfig() {
 
 	content, err := os.ReadFile(path)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to read config: %v", err)
 	}
 	err = yaml.Unmarshal(content, c)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to unmarshal config: %v", err)
 	}
 }
 
@@ -86,27 +89,33 @@ func (c *config) readFlags() {
 	flag.StringVar(&c.LogLevel, "log_level", c.LogLevel, "log level")
 	flag.StringVar(&c.LogType, "log_type", c.LogType, "log type")
 	flag.StringVar(&c.DataSecretKey, "data_secret_key", c.DataSecretKey, "data secret key")
+	flag.StringVar(&c.CertPath, "cert_path", c.CertPath, "TLS-certificate file path")
+	flag.StringVar(&c.CertKeyPath, "cert_key_path", c.CertKeyPath, "TLS-certificate key file path")
 	flag.Parse()
 }
 
 func (c *config) readEnv() {
 	err := env.Parse(c)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to read env: %v", err)
 	}
 }
 
 func (c config) print() {
 	c.TokenSecretKey = "**********"
 	c.DataSecretKey = "**********"
+	c.CertPath = "**********"
+	c.CertKeyPath = "**********"
 	content, err := yaml.Marshal(c)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to print config: %v", err)
 	}
 	fmt.Println(string(content))
 }
 
 func (c *config) toConfig() *srvcfg.Config {
+	cert, certKey := c.readCert()
+
 	res := &srvcfg.Config{
 		Address:        c.Address,
 		DatabaseDSN:    c.DatabaseDSN,
@@ -116,6 +125,24 @@ func (c *config) toConfig() *srvcfg.Config {
 		LogLevel:       c.LogLevel,
 		LogType:        c.LogType,
 		DataSecretKey:  []byte(c.DataSecretKey),
+		Cert:           cert,
+		CertKey:        certKey,
 	}
 	return res
+}
+
+func (c *config) readCert() (cert, certKey []byte) {
+	if c.CertPath == "" || c.CertKeyPath == "" {
+		return nil, nil
+	}
+
+	cert, err := os.ReadFile(c.CertPath)
+	if err != nil {
+		log.Fatalf("failed to read TLS-certificate: %v", err)
+	}
+	certKey, err = os.ReadFile(c.CertKeyPath)
+	if err != nil {
+		log.Fatalf("failed to read TLS-certificate key: %v", err)
+	}
+	return cert, certKey
 }

@@ -3,11 +3,13 @@ package main_test
 import (
 	"context"
 	"crypto/rand"
+	"crypto/x509"
+	"embed"
 	"github.com/dlomanov/gophkeeper/cmd/server/config"
 	"github.com/dlomanov/gophkeeper/internal/apps/server"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/grpcserver"
 	sharedmd "github.com/dlomanov/gophkeeper/internal/apps/shared/md"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
-	"github.com/dlomanov/gophkeeper/internal/infra/grpcserver"
 	"github.com/dlomanov/gophkeeper/internal/infra/pg/testcont"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +20,7 @@ import (
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
@@ -36,6 +38,9 @@ const (
 	bufferSize      = 1024 * 1024
 )
 
+//go:embed cert_test/*
+var certFs embed.FS
+
 type AppSuite struct {
 	suite.Suite
 	logger          *zap.Logger
@@ -44,6 +49,7 @@ type AppSuite struct {
 	listener        *bufconn.Listener
 	pgc             *postgres.PostgresContainer
 	serverStoppedCh chan error
+	cert            []byte
 }
 
 func TestAppSuite(t *testing.T) {
@@ -58,6 +64,8 @@ func (s *AppSuite) SetupSuite() {
 	s.listener = bufconn.Listen(bufferSize)
 
 	c := config.Parse()
+	c.Cert, c.CertKey = s.readCert()
+	s.cert = c.Cert
 	c.TokenSecretKey = s.generateKey()
 	c.DataSecretKey = s.generateKey()
 	s.pgc, c.DatabaseDSN, err = testcont.RunPostgres(s.teardownCtx, c.DatabaseDSN)
@@ -91,7 +99,7 @@ func (s *AppSuite) TearDownSuite() {
 	}
 }
 
-func (s *AppSuite) TestAuth() {
+func (s *AppSuite) TestApp() {
 	ctx, cancel := context.WithTimeout(s.teardownCtx, testTimeout)
 	defer cancel()
 	conn := s.createGRPCConn()
@@ -109,7 +117,7 @@ func (s *AppSuite) TestAuth() {
 		Password: "",
 	})
 	require.Error(s.T(), err, "expected error")
-	require.Equal(s.T(), codes.InvalidArgument, status.Code(err), "expected invalid argument code")
+	require.Equalf(s.T(), codes.InvalidArgument, status.Code(err), "expected invalid argument code, error: %v", err)
 
 	_, err = userService.SignIn(ctx, &pb.SignInUserRequest{
 		Login:    "testuser",
@@ -250,11 +258,16 @@ func (s *AppSuite) TestAuth() {
 }
 
 func (s *AppSuite) createGRPCConn() *grpc.ClientConn {
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(s.cert) {
+		s.T().Fatal("failed to append cert to pool")
+	}
+	creds := credentials.NewClientTLSFromCert(certPool, "")
 	conn, err := grpc.DialContext(s.teardownCtx, "bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return s.listener.Dial()
 		}),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+		grpc.WithTransportCredentials(creds))
 	require.NoError(s.T(), err)
 	return conn
 }
@@ -264,4 +277,12 @@ func (s *AppSuite) generateKey() []byte {
 	_, err := io.ReadFull(rand.Reader, key)
 	require.NoError(s.T(), err, "no error expected")
 	return key
+}
+
+func (s *AppSuite) readCert() (cert, certKey []byte) {
+	cert, err := certFs.ReadFile("cert_test/server.crt")
+	require.NoError(s.T(), err, "no error expected")
+	certKey, err = certFs.ReadFile("cert_test/server.key")
+	require.NoError(s.T(), err, "no error expected")
+	return cert, certKey
 }

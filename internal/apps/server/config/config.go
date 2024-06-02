@@ -6,16 +6,20 @@ import (
 	"time"
 )
 
-type Config struct {
-	Address        string        // GRPC-server address
-	DatabaseDSN    string        // Database DSN
-	PassHashCost   int           // Password hash cost
-	TokenSecretKey []byte        // Token secret key
-	TokenExpires   time.Duration // Token expires
-	LogLevel       string        // Log level
-	LogType        string        // Log type
-	DataSecretKey  []byte        // Data secret key
-}
+type (
+	Config struct {
+		Address        string        // GRPC-server address
+		DatabaseDSN    string        // Database DSN
+		PassHashCost   int           // Password hash cost
+		TokenSecretKey []byte        // Token secret key
+		TokenExpires   time.Duration // Token expires
+		LogLevel       string        // Log level
+		LogType        string        // Log type
+		DataSecretKey  []byte        // Data secret key
+		Cert           []byte
+		CertKey        []byte
+	}
+)
 
 func (c Config) Valid() error {
 	var errs []error
@@ -42,6 +46,9 @@ func (c Config) Valid() error {
 	}
 	if !encrypto.KeyValid(c.DataSecretKey) {
 		errs = append(errs, errors.New("data secret key should be specified"))
+	}
+	if len(c.Cert) == 0 || len(c.CertKey) == 0 {
+		errs = append(errs, errors.New("TLS certificate should be specified"))
 	}
 	return errors.Join(errs...)
 }

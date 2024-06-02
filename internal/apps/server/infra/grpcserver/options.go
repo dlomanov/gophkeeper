@@ -1,7 +1,10 @@
 package grpcserver
 
 import (
+	"crypto/tls"
+	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"net"
 	"time"
 )
@@ -33,8 +36,22 @@ func ShutdownTimeout(timeout time.Duration) Option {
 	}
 }
 
+func TLSCert(cert, certKey []byte) Option {
+	if len(cert) == 0 || len(certKey) == 0 {
+		panic("cert should be specified")
+	}
+	crt, err := tls.X509KeyPair(cert, certKey)
+	if err != nil {
+		panic(fmt.Errorf("failed to load TLS-cert: %w", err))
+	}
+	return func(s *Server) {
+		creds := credentials.NewServerTLSFromCert(&crt)
+		s.serverOptions = append(s.serverOptions, grpc.Creds(creds))
+	}
+}
+
 func ServerOptions(opts ...grpc.ServerOption) Option {
 	return func(s *Server) {
-		s.serverOptions = opts
+		s.serverOptions = append(s.serverOptions, opts...)
 	}
 }
