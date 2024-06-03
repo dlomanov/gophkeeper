@@ -47,7 +47,7 @@ func (s *EntryService) Get(
 		return nil, status.Error(codes.InvalidArgument, entities.ErrEntryIDInvalid.Error())
 	}
 
-	resp, err := s.entryUC.Get(ctx, usecases.GetEntryRequest{UserID: userID, ID: id})
+	got, err := s.entryUC.Get(ctx, usecases.GetEntryRequest{UserID: userID, ID: id})
 	var (
 		invalid  *apperrors.AppErrorInvalid
 		notFound *apperrors.AppErrorNotFound
@@ -65,7 +65,7 @@ func (s *EntryService) Get(
 		return nil, status.Error(codes.Internal, "internal server error")
 	}
 
-	return &pb.GetEntryResponse{Entry: s.toAPIEntry(*resp.Entry)}, nil
+	return &pb.GetEntryResponse{Entry: s.toAPIEntry(*got.Entry)}, nil
 }
 
 func (s *EntryService) GetAll(
@@ -78,7 +78,7 @@ func (s *EntryService) GetAll(
 		return nil, status.Error(codes.Unauthenticated, entities.ErrUserIDInvalid.Error())
 	}
 
-	resp, err := s.entryUC.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID})
+	got, err := s.entryUC.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID})
 	var (
 		invalid *apperrors.AppErrorInvalid
 	)
@@ -92,8 +92,8 @@ func (s *EntryService) GetAll(
 		return nil, status.Error(codes.Internal, "internal server error")
 	}
 
-	entries := make([]*pb.Entry, len(resp.Entries))
-	for i, entry := range resp.Entries {
+	entries := make([]*pb.Entry, len(got.Entries))
+	for i, entry := range got.Entries {
 		entries[i] = s.toAPIEntry(entry)
 	}
 	return &pb.GetAllEntriesResponse{Entries: entries}, nil
@@ -109,17 +109,22 @@ func (s *EntryService) Create(
 		return nil, status.Error(codes.Unauthenticated, entities.ErrUserIDInvalid.Error())
 	}
 
-	resp, err := s.entryUC.Create(ctx, usecases.CreateEntryRequest{
+	created, err := s.entryUC.Create(ctx, usecases.CreateEntryRequest{
 		Key:    request.Key,
 		UserID: userID,
 		Type:   s.toEntityType(request.Type),
 		Meta:   request.Meta,
 		Data:   request.Data,
 	})
-	var invalid *apperrors.AppErrorInvalid
+	var (
+		invalid  *apperrors.AppErrorInvalid
+		conflict *apperrors.AppErrorConflict
+	)
 	switch {
 	case errors.As(err, &invalid):
 		return nil, status.Error(codes.InvalidArgument, err.Error())
+	case errors.As(err, &conflict):
+		return nil, status.Error(codes.AlreadyExists, err.Error())
 	case err != nil:
 		s.logger.Error("failed to create entry",
 			zap.String("user_id", userID.String()),
@@ -128,9 +133,8 @@ func (s *EntryService) Create(
 	}
 
 	return &pb.CreateEntryResponse{
-		Id:        resp.ID.String(),
-		CreatedAt: resp.CreatedAt.UnixMicro(),
-		UpdatedAt: resp.UpdatedAt.UnixMicro(),
+		Id:      created.ID.String(),
+		Version: created.Version,
 	}, nil
 }
 
@@ -144,21 +148,25 @@ func (s *EntryService) Update(
 		return nil, status.Error(codes.Unauthenticated, entities.ErrUserIDInvalid.Error())
 	}
 
-	update, err := s.entryUC.Update(ctx, usecases.UpdateEntryRequest{
-		ID:     s.parseUUID(request.Id),
-		UserID: userID,
-		Meta:   request.Meta,
-		Data:   request.Data,
+	updated, err := s.entryUC.Update(ctx, usecases.UpdateEntryRequest{
+		ID:      s.parseUUID(request.Id),
+		UserID:  userID,
+		Meta:    request.Meta,
+		Data:    request.Data,
+		Version: request.Version,
 	})
 	var (
 		invalid  *apperrors.AppErrorInvalid
 		notFound *apperrors.AppErrorNotFound
+		conflict *apperrors.AppErrorConflict
 	)
 	switch {
 	case errors.As(err, &invalid):
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	case errors.As(err, &notFound):
 		return nil, status.Error(codes.NotFound, err.Error())
+	case errors.As(err, &conflict):
+		return nil, status.Error(codes.AlreadyExists, err.Error())
 	case err != nil:
 		s.logger.Error("failed to update entry",
 			zap.String("user_id", userID.String()),
@@ -168,13 +176,15 @@ func (s *EntryService) Update(
 	}
 
 	return &pb.UpdateEntryResponse{
-		Id:        update.ID.String(),
-		CreatedAt: update.CreatedAt.UnixMicro(),
-		UpdatedAt: update.UpdatedAt.UnixMicro(),
+		Id:      updated.ID.String(),
+		Version: updated.Version,
 	}, nil
 }
 
-func (s *EntryService) Delete(ctx context.Context, request *pb.DeleteEntryRequest) (*pb.DeleteEntryResponse, error) {
+func (s *EntryService) Delete(
+	ctx context.Context,
+	request *pb.DeleteEntryRequest,
+) (*pb.DeleteEntryResponse, error) {
 	userID, ok := interceptor.GetUserID(ctx)
 	if !ok {
 		s.logger.Debug("user id not found in context")
@@ -203,21 +213,19 @@ func (s *EntryService) Delete(ctx context.Context, request *pb.DeleteEntryReques
 	}
 
 	return &pb.DeleteEntryResponse{
-		Id:        deleted.ID.String(),
-		CreatedAt: deleted.CreatedAt.UnixMicro(),
-		UpdatedAt: deleted.UpdatedAt.UnixMicro(),
+		Id:      deleted.ID.String(),
+		Version: deleted.Version,
 	}, nil
 }
 
 func (s *EntryService) toAPIEntry(entry entities.Entry) *pb.Entry {
 	return &pb.Entry{
-		Id:        entry.ID.String(),
-		Key:       entry.Key,
-		Type:      s.toAPIType(entry.Type),
-		Meta:      entry.Meta,
-		Data:      entry.Data,
-		CreatedAt: entry.CreatedAt.UnixMicro(),
-		UpdatedAt: entry.UpdatedAt.UnixMicro(),
+		Id:      entry.ID.String(),
+		Key:     entry.Key,
+		Type:    s.toAPIType(entry.Type),
+		Meta:    entry.Meta,
+		Data:    entry.Data,
+		Version: entry.Version,
 	}
 }
 

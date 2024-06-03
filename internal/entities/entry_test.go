@@ -160,10 +160,13 @@ func TestUpdate(t *testing.T) {
 			now := time.Now().UTC()
 			typ := entities.EntryTypeBinary
 			entry := entities.Entry{
+				Version:   1,
 				Type:      typ,
 				UpdatedAt: now,
 			}
+			srcVersion := entry.Version
 			errs := entry.Update(
+				entry.Version,
 				entities.UpdateEntryData(tt.data),
 				entities.UpdateEntryMeta(tt.meta))
 			for _, wantErr := range tt.wantErrs {
@@ -178,6 +181,7 @@ func TestUpdate(t *testing.T) {
 			assert.True(t, reflect.DeepEqual(tt.meta, entry.Meta), "metadata mismatch")
 			assert.NotEmpty(t, entry.UpdatedAt, "updated at should not be empty")
 			assert.GreaterOrEqual(t, entry.UpdatedAt, now, "updated at should be greater or equal to created at")
+			assert.Equal(t, srcVersion+1, entry.Version, "version mismatch")
 		})
 	}
 }
@@ -185,7 +189,7 @@ func TestUpdate(t *testing.T) {
 func TestUpdate_nonOptions(t *testing.T) {
 	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
 	require.NoError(t, err, "failed to create entry")
-	err = entry.Update()
+	err = entry.Update(entry.Version)
 	require.NoError(t, err)
 	assert.Equal(t, entry.CreatedAt, entry.UpdatedAt, "created at should be equal to updated at")
 }
@@ -193,10 +197,17 @@ func TestUpdate_nonOptions(t *testing.T) {
 func TestUpdate_invalidOptions(t *testing.T) {
 	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
 	require.NoError(t, err, "failed to create entry")
-	errs := entry.Update(
+	errs := entry.Update(entry.Version,
 		entities.UpdateEntryData(nil),
 		entities.UpdateEntryData([]byte(strings.Repeat("s", entities.EntryMaxDataSize+1))),
 	)
 	require.ErrorIs(t, errs, entities.ErrEntryDataEmpty, "want data empty error")
 	require.ErrorIs(t, errs, entities.ErrEntryDataSizeExceeded, "want data size exceeded error")
+}
+
+func TestUpdate_versionConflict(t *testing.T) {
+	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
+	require.NoError(t, err, "failed to create entry")
+	errs := entry.Update(entry.Version-1, entities.UpdateEntryData([]byte("test1")))
+	require.ErrorIs(t, errs, entities.ErrEntryVersionConflict, "want version conflict error")
 }

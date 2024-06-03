@@ -33,7 +33,6 @@ func interceptorLogger(logger *zap.Logger) logging.Logger {
 				}
 			}
 		}
-
 		switch lvl {
 		case logging.LevelDebug:
 			logger.Debug(msg, values...)

@@ -10,6 +10,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"time"
 )
 
@@ -25,8 +26,13 @@ type (
 		Type      string         `db:"type"`
 		Meta      sql.NullString `db:"meta"`
 		Data      []byte         `db:"data"`
+		Version   int64          `db:"version"`
 		CreatedAt time.Time      `db:"created_at"`
 		UpdatedAt time.Time      `db:"updated_at"`
+	}
+	entryVersionRow struct {
+		ID      uuid.UUID `db:"id"`
+		Version int64     `db:"version"`
 	}
 )
 
@@ -43,7 +49,7 @@ func NewEntryRepo(
 func (r *EntryRepo) Get(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entities.Entry, error) {
 	row := entryRow{}
 	err := r.getDB(ctx).GetContext(ctx, &row, `
-		SELECT id, user_id, key, type, meta, data, created_at, updated_at
+		SELECT id, user_id, key, type, meta, data, version, created_at, updated_at
 		FROM entries
 		WHERE id = $1 AND user_id = $2;`, id, userID)
 	switch {
@@ -58,10 +64,43 @@ func (r *EntryRepo) Get(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*e
 func (r *EntryRepo) GetAll(ctx context.Context, userID uuid.UUID) ([]entities.Entry, error) {
 	var rows []entryRow
 	err := r.getDB(ctx).SelectContext(ctx, &rows, `
-		SELECT id, user_id, key, type, meta, data, created_at, updated_at
+		SELECT id, user_id, key, type, meta, data, version, created_at, updated_at
 		FROM entries
 		WHERE user_id = $1
 		ORDER BY created_at;`, userID)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("entry_repo: failed to get entries: %w", err)
+	}
+	return r.toEntities(rows)
+}
+
+func (r *EntryRepo) GetVersions(ctx context.Context, userID uuid.UUID) ([]entities.EntryVersion, error) {
+	var rows []entryVersionRow
+	err := r.getDB(ctx).SelectContext(ctx, &rows, `
+		SELECT id, version FROM entries WHERE user_id = $1;`, userID)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("entry_repo: failed to get entry versions: %w", err)
+	}
+	return r.toEntryVersions(rows)
+}
+
+func (r *EntryRepo) GetByIds(
+	ctx context.Context,
+	userID uuid.UUID,
+	entryIds []uuid.UUID,
+) ([]entities.Entry, error) {
+	var rows []entryRow
+	err := r.getDB(ctx).SelectContext(ctx, &rows, `
+		SELECT id, user_id, key, type, meta, data, version, created_at, updated_at
+		FROM entries
+		WHERE user_id = $1 AND id = ANY($2)
+		ORDER BY created_at;`, userID, pq.Array(entryIds))
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return nil, nil
@@ -77,8 +116,8 @@ func (r *EntryRepo) Create(ctx context.Context, e *entities.Entry) error {
 		return err
 	}
 	result, err := r.getDB(ctx).NamedExecContext(ctx, `
-		INSERT INTO entries (id, user_id, key, type, meta, data, created_at, updated_at)
-		VALUES (:id, :user_id, :key, :type, :meta, :data, :created_at, :updated_at)
+		INSERT INTO entries (id, user_id, key, type, meta, data, version, created_at, updated_at)
+		VALUES (:id, :user_id, :key, :type, :meta, :data, :version, :created_at, :updated_at)
 		ON CONFLICT DO NOTHING
 	`, row)
 	if err != nil {
@@ -103,6 +142,7 @@ func (r *EntryRepo) Update(ctx context.Context, e *entities.Entry) error {
 		UPDATE entries
 		SET meta = :meta,
 		    data = :data,
+		    version = :version,
 		    updated_at = :updated_at
 		WHERE id = :id AND user_id = :user_id
 	`, row)
@@ -152,6 +192,7 @@ func (*EntryRepo) toRow(e *entities.Entry) (entryRow, error) {
 		Type:      string(e.Type),
 		Meta:      sql.NullString{},
 		Data:      e.Data,
+		Version:   e.Version,
 		CreatedAt: e.CreatedAt,
 		UpdatedAt: e.UpdatedAt,
 	}
@@ -187,6 +228,7 @@ func (*EntryRepo) toEntity(row entryRow) (*entities.Entry, error) {
 		Type:      "",
 		Meta:      nil,
 		Data:      row.Data,
+		Version:   row.Version,
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,
 	}
@@ -206,4 +248,15 @@ func (*EntryRepo) toEntity(row entryRow) (*entities.Entry, error) {
 	}
 
 	return entry, nil
+}
+
+func (r *EntryRepo) toEntryVersions(rows []entryVersionRow) ([]entities.EntryVersion, error) {
+	versions := make([]entities.EntryVersion, 0, len(rows))
+	for _, row := range rows {
+		versions = append(versions, entities.EntryVersion{
+			ID:      row.ID,
+			Version: row.Version,
+		})
+	}
+	return versions, nil
 }

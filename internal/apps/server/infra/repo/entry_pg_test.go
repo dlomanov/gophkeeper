@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 )
@@ -79,9 +80,9 @@ func (s *EntryTestSuit) TestEntryRepo() {
 	entryRepo := repo.NewEntryRepo(s.db, trmsqlx.DefaultCtxGetter)
 	_, err = entryRepo.Get(ctx, user.ID, uuid.New())
 	require.ErrorIs(s.T(), err, entities.ErrEntryNotFound, "expected entry not found error")
-	result, err := entryRepo.GetAll(ctx, user.ID)
+	getAll, err := entryRepo.GetAll(ctx, user.ID)
 	require.NoError(s.T(), err, "no error expected when getting entries")
-	require.Empty(s.T(), result, "expected empty entries")
+	require.Empty(s.T(), getAll, "expected empty entries")
 
 	entries := make([]*entities.Entry, 3)
 	entries[0], err = entities.NewEntry("key1", user.ID, entities.EntryTypePassword, []byte("test_data_1"))
@@ -99,10 +100,10 @@ func (s *EntryTestSuit) TestEntryRepo() {
 	require.Error(s.T(), err, "expected entry already exists error")
 	require.ErrorIs(s.T(), err, entities.ErrEntryExists, "expected entry already exists error")
 
-	result, err = entryRepo.GetAll(ctx, user.ID)
+	getAll, err = entryRepo.GetAll(ctx, user.ID)
 	require.NoError(s.T(), err, "no error expected when getting entries")
-	require.Equal(s.T(), 3, len(result), "expected 3 entries")
-	for i, x := range result {
+	require.Equal(s.T(), 3, len(getAll), "expected 3 entries")
+	for i, x := range getAll {
 		s.assertEquals(s.T(), entries[i], &x)
 	}
 
@@ -113,6 +114,37 @@ func (s *EntryTestSuit) TestEntryRepo() {
 	resultEntry, err := entryRepo.Get(ctx, user.ID, entries[0].ID)
 	require.NoError(s.T(), err, "no error expected when getting entry")
 	s.assertEquals(s.T(), entries[0], resultEntry)
+
+	// GetVersions and GetByIds
+	getAll, err = entryRepo.GetAll(ctx, user.ID)
+	require.NoError(s.T(), err, "no error expected when getting entries")
+	versions, err := entryRepo.GetVersions(ctx, user.ID)
+	require.NoError(s.T(), err, "no error expected when getting entry versions")
+	require.Equal(s.T(), len(getAll), len(versions), "expected same number of entries and versions")
+	entryIds := make([]uuid.UUID, len(versions))
+	for i, version := range versions {
+		exists := slices.ContainsFunc(getAll, func(x entities.Entry) bool {
+			return x.ID == version.ID && x.Version == version.Version
+		})
+		require.True(s.T(), exists, "expected entry version exists")
+		entryIds[i] = version.ID
+	}
+	entryIds = entryIds[:len(entryIds)-1]
+	getByIds, err := entryRepo.GetByIds(ctx, user.ID, entryIds)
+	require.NoError(s.T(), err, "no error expected when getting entries")
+	require.Equal(s.T(), len(entryIds), len(getByIds), "expected same number of entries and versions")
+	compared := 0
+	for _, entry := range getByIds {
+		for _, entry2 := range getAll {
+			if entry.ID != entry2.ID {
+				continue
+			}
+			s.assertEquals(s.T(), &entry, &entry2)
+			compared++
+			break
+		}
+	}
+	require.Equal(s.T(), len(entryIds), compared, "expected same number of entries and versions")
 }
 
 func (s *EntryTestSuit) assertEquals(t *testing.T, expected *entities.Entry, actual *entities.Entry) {
@@ -123,4 +155,8 @@ func (s *EntryTestSuit) assertEquals(t *testing.T, expected *entities.Entry, act
 	assert.Equal(t, expected.Data, actual.Data, "expected same entry data")
 	assert.Equal(t, expected.CreatedAt.Format("2006-01-02 15:04:05.000"), actual.CreatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry created at")
 	assert.Equal(t, expected.UpdatedAt.Format("2006-01-02 15:04:05.000"), actual.UpdatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry updated at")
+}
+
+func TestEntryTestSuit(t *testing.T) {
+	suite.Run(t, new(EntryTestSuit))
 }

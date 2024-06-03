@@ -10,6 +10,7 @@ var (
 	_ error = (*AppErrorTransient)(nil)
 	_ error = (*AppErrorInvalid)(nil)
 	_ error = (*AppErrorNotFound)(nil)
+	_ error = (*AppErrorConflict)(nil)
 	_ error = (*AppErrorInternal)(nil)
 )
 
@@ -25,6 +26,9 @@ type (
 		AppError
 	}
 	AppErrorNotFound struct {
+		AppError
+	}
+	AppErrorConflict struct {
 		AppError
 	}
 	AppErrorInternal struct {
@@ -58,6 +62,12 @@ func NewInternal(msg string) *AppErrorInternal {
 
 func NewNotFound(msg string) *AppErrorNotFound {
 	return &AppErrorNotFound{
+		AppError: AppError{msg: msg},
+	}
+}
+
+func NewConflict(msg string) *AppErrorConflict {
+	return &AppErrorConflict{
 		AppError: AppError{msg: msg},
 	}
 }

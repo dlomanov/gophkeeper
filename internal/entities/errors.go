@@ -7,6 +7,8 @@ var (
 	ErrEntryIsNil            = apperrors.NewInvalid("entry is nil")
 	ErrEntryIDInvalid        = apperrors.NewInvalid("invalid entry ID")
 	ErrEntryTypeInvalid      = apperrors.NewInvalid("invalid entry type")
+	ErrEntryVersionConflict  = apperrors.NewConflict("entry version conflict")
+	ErrEntryVersionInvalid   = apperrors.NewInvalid("entry version invalid")
 	ErrEntryDataEmpty        = apperrors.NewInvalid("empty entry data")
 	ErrEntryDataSizeExceeded = apperrors.NewInvalid("entry data size exceeded")
 	ErrEntryExists           = apperrors.NewInvalid("entry already exists")

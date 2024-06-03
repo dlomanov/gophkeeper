@@ -59,11 +59,12 @@ func TestAppSuite(t *testing.T) {
 func (s *AppSuite) SetupSuite() {
 	var err error
 
-	s.logger = zaptest.NewLogger(s.T(), zaptest.Level(zap.InfoLevel))
+	s.logger = zaptest.NewLogger(s.T(), zaptest.Level(zap.DebugLevel))
 	s.teardownCtx, s.teardown = context.WithCancel(context.Background())
 	s.listener = bufconn.Listen(bufferSize)
 
 	c := config.Parse()
+	c.LogLevel = "fatal"
 	c.Cert, c.CertKey = s.readCert()
 	s.cert = c.Cert
 	c.TokenSecretKey = s.generateKey()
@@ -185,9 +186,7 @@ func (s *AppSuite) TestApp() {
 		created, err := entryService.Create(ctx, entry)
 		require.NoError(s.T(), err, "no error expected")
 		assert.NotEqual(s.T(), created.Id, uuid.Nil.String(), "expected not empty ID")
-		assert.NotEmpty(s.T(), created.CreatedAt, "expected not empty created_at")
-		assert.NotEmpty(s.T(), created.UpdatedAt, "expected not empty updated_at")
-		assert.Equal(s.T(), created.CreatedAt, created.UpdatedAt, "expected created_at == updated_at")
+		assert.Equal(s.T(), int64(1), created.Version, "expected version == 1")
 	}
 	getAll, err = entryService.GetAll(ctx, &pb.GetAllEntriesRequest{})
 	require.NoError(s.T(), err, "no error expected")
@@ -198,6 +197,7 @@ func (s *AppSuite) TestApp() {
 		assert.Equal(s.T(), createEntries[i].Type, entry.Type, "entry type mismatch")
 		assert.True(s.T(), reflect.DeepEqual(createEntries[i].Meta, entry.Meta), "entry meta mismatch")
 		assert.Equal(s.T(), createEntries[i].Data, entry.Data, "entry data mismatch")
+		assert.Equal(s.T(), int64(1), entry.Version, "entry version mismatch")
 	}
 	get, err := entryService.Get(ctx, &pb.GetEntryRequest{Id: getAll.Entries[0].Id})
 	require.NoError(s.T(), err, "no error expected")
@@ -208,14 +208,14 @@ func (s *AppSuite) TestApp() {
 	assert.Equal(s.T(), getAll.Entries[0].Type, get.Entry.Type, "entry type mismatch")
 	assert.True(s.T(), reflect.DeepEqual(getAll.Entries[0].Meta, get.Entry.Meta), "entry meta mismatch")
 	assert.Equal(s.T(), getAll.Entries[0].Data, get.Entry.Data, "entry data mismatch")
+	assert.Equal(s.T(), int64(1), get.Entry.Version, "entry version mismatch")
 
 	// 2.2 Entries: delete
 	entries := getAll.Entries
 	deleted, err := entryService.Delete(ctx, &pb.DeleteEntryRequest{Id: entries[0].Id})
 	require.NoError(s.T(), err, "no error expected")
 	assert.Equal(s.T(), entries[0].Id, deleted.Id, "deleted entry id mismatch")
-	assert.Equal(s.T(), entries[0].CreatedAt, deleted.CreatedAt, "deleted entry created_at mismatch")
-	assert.Equal(s.T(), entries[0].UpdatedAt, deleted.UpdatedAt, "deleted entry updated_at mismatch")
+	assert.Equal(s.T(), entries[0].Version, deleted.Version, "deleted entry version mismatch")
 	entries = entries[1:]
 	getAll, err = entryService.GetAll(ctx, &pb.GetAllEntriesRequest{})
 	require.NoError(s.T(), err, "no error expected")
@@ -227,20 +227,21 @@ func (s *AppSuite) TestApp() {
 		assert.Equal(s.T(), entries[i].Type, entry.Type, "entry type mismatch")
 		assert.True(s.T(), reflect.DeepEqual(entries[i].Meta, entry.Meta), "entry meta mismatch")
 		assert.Equal(s.T(), entries[i].Data, entry.Data, "entry data")
+		assert.Equal(s.T(), entries[i].Version, entry.Version, "entry version mismatch")
 	}
 
 	// 2.3 Entries: update
 	entries[0].Meta["updated_key"] = "updated_value"
 	entries[0].Data = []byte("updated_data")
 	updated, err := entryService.Update(ctx, &pb.UpdateEntryRequest{
-		Id:   entries[0].Id,
-		Meta: entries[0].Meta,
-		Data: entries[0].Data,
+		Id:      entries[0].Id,
+		Version: entries[0].Version,
+		Meta:    entries[0].Meta,
+		Data:    entries[0].Data,
 	})
 	require.NoError(s.T(), err, "no error expected on update")
 	assert.Equal(s.T(), entries[0].Id, updated.Id, "updated entry id mismatch")
-	assert.Equal(s.T(), entries[0].CreatedAt, updated.CreatedAt, "updated entry created_at mismatch")
-	assert.Greater(s.T(), updated.UpdatedAt, entries[0].UpdatedAt, "updated_at should changed")
+	assert.Equal(s.T(), entries[0].Version+1, updated.Version, "updated entry version mismatch")
 	_, err = entryService.Get(ctx, &pb.GetEntryRequest{Id: uuid.New().String()})
 	require.Error(s.T(), err, "expected error on unknown entry")
 	require.Equalf(s.T(), codes.NotFound, status.Code(err), "expected not found code, got %v", status.Code(err))
@@ -253,8 +254,19 @@ func (s *AppSuite) TestApp() {
 	assert.Equal(s.T(), entries[0].Type, get.Entry.Type, "get entry type mismatch")
 	assert.True(s.T(), reflect.DeepEqual(entries[0].Meta, get.Entry.Meta), "get entry meta mismatch")
 	assert.Equal(s.T(), entries[0].Data, get.Entry.Data, "get entry data mismatch")
-	assert.Equal(s.T(), entries[0].CreatedAt, get.Entry.CreatedAt, "get entry created_at mismatch")
-	assert.Equal(s.T(), updated.UpdatedAt, get.Entry.UpdatedAt, "get entry updated_at mismatch")
+	assert.Equal(s.T(), updated.Version, get.Entry.Version, "get entry version mismatch")
+
+	// 3 Version validation
+	entries[0].Meta["updated_key"] = "updated_value"
+	entries[0].Data = []byte("updated_data")
+	_, err = entryService.Update(ctx, &pb.UpdateEntryRequest{
+		Id:      entries[0].Id,
+		Version: 1,
+		Meta:    entries[0].Meta,
+		Data:    entries[0].Data,
+	})
+	require.Error(s.T(), err, "expected error on invalid version")
+	require.Equal(s.T(), codes.AlreadyExists, status.Code(err), "expected invalid argument code")
 }
 
 func (s *AppSuite) createGRPCConn() *grpc.ClientConn {

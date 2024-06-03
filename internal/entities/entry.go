@@ -21,16 +21,21 @@ const (
 )
 
 type (
-	EntryType string
-	Entry     struct {
+	Entry struct {
 		ID        uuid.UUID
 		UserID    uuid.UUID
 		Key       string
 		Type      EntryType
 		Meta      map[string]string
 		Data      []byte
+		Version   int64
 		CreatedAt time.Time
 		UpdatedAt time.Time
+	}
+	EntryType    string
+	EntryVersion struct {
+		ID      uuid.UUID
+		Version int64
 	}
 	EntryUpdateOption func(e *Entry) error
 )
@@ -77,12 +82,16 @@ func NewEntry(
 		Type:      typ,
 		Data:      data,
 		Meta:      nil,
+		Version:   1,
 		CreatedAt: utcNow,
 		UpdatedAt: utcNow,
 	}, nil
 }
 
-func (e *Entry) Update(opts ...EntryUpdateOption) error {
+func (e *Entry) Update(version int64, opts ...EntryUpdateOption) error {
+	if version != e.Version {
+		return fmt.Errorf("%w: %d != %d", ErrEntryVersionConflict, version, e.Version)
+	}
 	if len(opts) == 0 {
 		return nil
 	}
@@ -95,6 +104,7 @@ func (e *Entry) Update(opts ...EntryUpdateOption) error {
 		return err
 	}
 	e.UpdatedAt = time.Now().UTC()
+	e.Version++
 	return nil
 }
 

@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
-	"time"
 )
 
 type (
@@ -22,6 +21,8 @@ type (
 	EntryRepo interface {
 		Get(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entities.Entry, error)
 		GetAll(ctx context.Context, userID uuid.UUID) ([]entities.Entry, error)
+		GetByIds(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]entities.Entry, error)
+		GetVersions(ctx context.Context, userID uuid.UUID) ([]entities.EntryVersion, error)
 		Create(ctx context.Context, entry *entities.Entry) error
 		Update(ctx context.Context, entry *entities.Entry) error
 		Delete(ctx context.Context, userID uuid.UUID, id uuid.UUID) error
@@ -33,6 +34,13 @@ type (
 	GetEntryRequest struct {
 		UserID uuid.UUID
 		ID     uuid.UUID
+	}
+	GetNewestEntriesRequest struct {
+		UserID   uuid.UUID
+		Versions map[string]int64
+	}
+	GetNewestEntriesResponse struct {
+		Entries []entities.Entry
 	}
 	GetEntryResponse struct {
 		Entry *entities.Entry
@@ -51,29 +59,27 @@ type (
 		Data   []byte
 	}
 	CreateEntryResponse struct {
-		ID        uuid.UUID
-		CreatedAt time.Time
-		UpdatedAt time.Time
+		ID      uuid.UUID
+		Version int64
 	}
 	UpdateEntryRequest struct {
-		ID     uuid.UUID
-		UserID uuid.UUID
-		Meta   map[string]string
-		Data   []byte
+		ID      uuid.UUID
+		UserID  uuid.UUID
+		Meta    map[string]string
+		Data    []byte
+		Version int64
 	}
 	UpdateEntryResponse struct {
-		ID        uuid.UUID
-		CreatedAt time.Time
-		UpdatedAt time.Time
+		ID      uuid.UUID
+		Version int64
 	}
 	DeleteEntryRequest struct {
 		ID     uuid.UUID
 		UserID uuid.UUID
 	}
 	DeleteEntryResponse struct {
-		ID        uuid.UUID
-		CreatedAt time.Time
-		UpdatedAt time.Time
+		ID      uuid.UUID
+		Version int64
 	}
 )
 
@@ -133,14 +139,68 @@ func (uc *EntryUC) Get(
 func (uc *EntryUC) GetEntries(
 	ctx context.Context,
 	request GetEntriesRequest,
-) (GetEntriesResponse, error) {
-	response := GetEntriesResponse{}
-	if err := request.validate(); err != nil {
+) (response GetEntriesResponse, err error) {
+	if err = request.validate(); err != nil {
 		return response, fmt.Errorf("get all entries: invalid request: %w", err)
 	}
 	userID := request.UserID
 
 	entries, err := uc.entryRepo.GetAll(ctx, userID)
+	if err != nil {
+		uc.logger.Error("failed to get entries",
+			zap.String("user_id", userID.String()),
+			zap.Error(err))
+		return response, err
+	}
+	for i := range entries {
+		decrypted, err := uc.encrypter.Decrypt(entries[i].Data)
+		if err != nil {
+			uc.logger.Error("failed to decrypt entry",
+				zap.String("user_id", userID.String()),
+				zap.Error(err))
+			return response, fmt.Errorf("get all entries: failed to decrypt entry: %w", err)
+		}
+		entries[i].Data = decrypted
+	}
+	response.Entries = entries
+
+	return response, nil
+}
+
+func (uc *EntryUC) GetNewestEntries(
+	ctx context.Context,
+	request GetNewestEntriesRequest,
+) (response GetNewestEntriesResponse, err error) {
+	if err := request.validate(); err != nil {
+		return response, fmt.Errorf("get all entries: invalid request: %w", err)
+	}
+	userID := request.UserID
+
+	versions, err := uc.entryRepo.GetVersions(ctx, userID)
+	if err != nil {
+		uc.logger.Error("failed to get versions",
+			zap.String("user_id", userID.String()),
+			zap.Error(err))
+		return response, err
+	}
+	if len(versions) == 0 {
+		return response, nil
+	}
+	var entryIds []uuid.UUID
+	for _, v := range versions {
+		if version, ok := request.Versions[v.ID.String()]; ok {
+			if version != v.Version { // server wins
+				entryIds = append(entryIds, v.ID)
+			}
+			continue
+		}
+		entryIds = append(entryIds, v.ID)
+	}
+	if len(entryIds) == 0 {
+		return response, nil
+	}
+
+	entries, err := uc.entryRepo.GetByIds(ctx, userID, entryIds)
 	if err != nil {
 		uc.logger.Error("failed to get entries",
 			zap.String("user_id", userID.String()),
@@ -201,8 +261,7 @@ func (uc *EntryUC) Create(
 		return resp, err
 	}
 	resp.ID = entry.ID
-	resp.CreatedAt = entry.CreatedAt
-	resp.UpdatedAt = entry.UpdatedAt
+	resp.Version = entry.Version
 
 	return resp, nil
 }
@@ -243,6 +302,7 @@ func (uc *EntryUC) Update(
 			return err
 		}
 		if err := entry.Update(
+			request.Version,
 			entities.UpdateEntryMeta(request.Meta),
 			entities.UpdateEntryData(encrypted)); err != nil {
 			uc.logger.Debug("failed to update entry because of invalid arguments",
@@ -260,15 +320,14 @@ func (uc *EntryUC) Update(
 		}
 		return nil
 	}); err != nil {
-		uc.logger.Error("failed to update entry in storage",
+		uc.logger.Error("failed to update entry in transaction",
 			zap.String("user_id", userID.String()),
 			zap.String("entry_id", id.String()),
 			zap.Error(err))
 		return resp, err
 	}
 	resp.ID = entry.ID
-	resp.CreatedAt = entry.CreatedAt
-	resp.UpdatedAt = entry.UpdatedAt
+	resp.Version = entry.Version
 
 	return resp, nil
 }
@@ -321,8 +380,7 @@ func (uc *EntryUC) Delete(
 		return resp, err
 	}
 	resp.ID = entry.ID
-	resp.CreatedAt = entry.CreatedAt
-	resp.UpdatedAt = entry.UpdatedAt
+	resp.Version = entry.Version
 
 	return resp, nil
 }
@@ -336,6 +394,13 @@ func (r GetEntryRequest) validate() error {
 		err = multierr.Append(err, entities.ErrEntryIDInvalid)
 	}
 	return err
+}
+
+func (r GetNewestEntriesRequest) validate() error {
+	if r.UserID == uuid.Nil {
+		return entities.ErrUserIDInvalid
+	}
+	return nil
 }
 
 func (r GetEntriesRequest) validate() error {
@@ -378,6 +443,9 @@ func (r UpdateEntryRequest) validate() error {
 	}
 	if len(r.Data) > entities.EntryMaxDataSize {
 		err = multierr.Append(err, entities.ErrEntryDataSizeExceeded)
+	}
+	if r.Version == 0 {
+		err = multierr.Append(err, entities.ErrEntryVersionInvalid)
 	}
 	return err
 }

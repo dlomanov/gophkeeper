@@ -147,7 +147,7 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 
 const (
 	EntryService_Get_FullMethodName    = "/proto.EntryService/Get"
-	EntryService_GetAll_FullMethodName = "/proto.EntryService/GetEntries"
+	EntryService_GetAll_FullMethodName = "/proto.EntryService/GetAll"
 	EntryService_Create_FullMethodName = "/proto.EntryService/Create"
 	EntryService_Update_FullMethodName = "/proto.EntryService/Update"
 	EntryService_Delete_FullMethodName = "/proto.EntryService/Delete"
@@ -237,7 +237,7 @@ func (UnimplementedEntryServiceServer) Get(context.Context, *GetEntryRequest) (*
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
 func (UnimplementedEntryServiceServer) GetAll(context.Context, *GetAllEntriesRequest) (*GetAllEntriesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetEntries not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method GetAll not implemented")
 }
 func (UnimplementedEntryServiceServer) Create(context.Context, *CreateEntryRequest) (*CreateEntryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
@@ -363,7 +363,7 @@ var EntryService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _EntryService_Get_Handler,
 		},
 		{
-			MethodName: "GetEntries",
+			MethodName: "GetAll",
 			Handler:    _EntryService_GetAll_Handler,
 		},
 		{

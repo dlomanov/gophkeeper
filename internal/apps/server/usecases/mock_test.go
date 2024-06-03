@@ -108,6 +108,46 @@ func (r *MockEntryRepo) GetAll(_ context.Context, userID uuid.UUID) ([]entities.
 	return entries, nil
 }
 
+func (r *MockEntryRepo) GetByIds(
+	ctx context.Context,
+	userID uuid.UUID,
+	ids []uuid.UUID,
+) ([]entities.Entry, error) {
+	entries, err := r.GetAll(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []entities.Entry
+	for _, v := range entries {
+		for _, id := range ids {
+			if v.ID == id {
+				result = append(result, v)
+			}
+		}
+	}
+	return result, nil
+}
+
+func (r *MockEntryRepo) GetVersions(
+	ctx context.Context,
+	userID uuid.UUID,
+) ([]entities.EntryVersion, error) {
+	entries, err := r.GetAll(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	versions := make([]entities.EntryVersion, len(entries))
+	for i, v := range entries {
+		versions[i] = entities.EntryVersion{
+			ID:      v.ID,
+			Version: v.Version,
+		}
+	}
+	return versions, nil
+}
+
 func (r *MockEntryRepo) Create(_ context.Context, entry *entities.Entry) error {
 	key := r.toKey(entry.UserID, entry.ID)
 
