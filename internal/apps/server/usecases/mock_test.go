@@ -1,13 +1,12 @@
 package usecases_test
 
 import (
-	"cmp"
 	"context"
 	"github.com/avito-tech/go-transaction-manager/trm/v2"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
 	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/google/uuid"
-	"slices"
+	"sort"
 	"sync"
 )
 
@@ -101,8 +100,8 @@ func (r *MockEntryRepo) GetAll(_ context.Context, userID uuid.UUID) ([]entities.
 	}
 	r.mu.RUnlock()
 
-	slices.SortFunc(entries, func(a, b entities.Entry) int {
-		return cmp.Compare(a.CreatedAt.Nanosecond(), b.CreatedAt.Nanosecond())
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].CreatedAt.Before(entries[j].CreatedAt)
 	})
 
 	return entries, nil

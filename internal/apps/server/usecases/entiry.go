@@ -270,66 +270,14 @@ func (uc *EntryUC) Update(
 	ctx context.Context,
 	request UpdateEntryRequest,
 ) (resp UpdateEntryResponse, err error) {
-	if err = request.validate(); err != nil {
-		return resp, fmt.Errorf("update entry: invalid request: %w", err)
-	}
-	userID := request.UserID
-	id := request.ID
+	return uc.update(ctx, request, false)
+}
 
-	encrypted, err := uc.encrypter.Encrypt(request.Data)
-	if err != nil {
-		uc.logger.Error("failed to encrypt entry",
-			zap.String("user_id", userID.String()),
-			zap.Error(err))
-		return resp, fmt.Errorf("update entry: failed to encrypt entry: %w", err)
-	}
-	var entry *entities.Entry
-	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
-		var err error
-		entry, err = uc.entryRepo.Get(ctx, userID, id)
-		switch {
-		case errors.Is(err, entities.ErrEntryNotFound):
-			uc.logger.Debug("entry not found while updating",
-				zap.String("user_id", userID.String()),
-				zap.String("entry_id", id.String()),
-				zap.Error(err))
-			return err
-		case err != nil:
-			uc.logger.Error("failed to get entry while updating",
-				zap.String("user_id", userID.String()),
-				zap.String("entry_id", id.String()),
-				zap.Error(err))
-			return err
-		}
-		if err := entry.Update(
-			request.Version,
-			entities.UpdateEntryMeta(request.Meta),
-			entities.UpdateEntryData(encrypted)); err != nil {
-			uc.logger.Debug("failed to update entry because of invalid arguments",
-				zap.String("user_id", userID.String()),
-				zap.String("entry_id", id.String()),
-				zap.Error(err))
-			return err
-		}
-		if err := uc.entryRepo.Update(ctx, entry); err != nil {
-			uc.logger.Error("failed to update entry in storage",
-				zap.String("user_id", userID.String()),
-				zap.String("entry_id", id.String()),
-				zap.Error(err))
-			return err
-		}
-		return nil
-	}); err != nil {
-		uc.logger.Error("failed to update entry in transaction",
-			zap.String("user_id", userID.String()),
-			zap.String("entry_id", id.String()),
-			zap.Error(err))
-		return resp, err
-	}
-	resp.ID = entry.ID
-	resp.Version = entry.Version
-
-	return resp, nil
+func (uc *EntryUC) UpdateForced(
+	ctx context.Context,
+	request UpdateEntryRequest,
+) (resp UpdateEntryResponse, err error) {
+	return uc.update(ctx, request, true)
 }
 
 func (uc *EntryUC) Delete(
@@ -377,6 +325,81 @@ func (uc *EntryUC) Delete(
 		}
 		return nil
 	}); err != nil {
+		return resp, err
+	}
+	resp.ID = entry.ID
+	resp.Version = entry.Version
+
+	return resp, nil
+}
+
+func (uc *EntryUC) update(
+	ctx context.Context,
+	request UpdateEntryRequest,
+	force bool,
+) (resp UpdateEntryResponse, err error) {
+	if err = request.validate(); err != nil {
+		return resp, fmt.Errorf("update entry: invalid request: %w", err)
+	}
+	userID := request.UserID
+	id := request.ID
+	version := request.Version
+
+	encrypted, err := uc.encrypter.Encrypt(request.Data)
+	if err != nil {
+		uc.logger.Error("failed to encrypt entry",
+			zap.String("user_id", userID.String()),
+			zap.Error(err))
+		return resp, fmt.Errorf("update entry: failed to encrypt entry: %w", err)
+	}
+	var entry *entities.Entry
+	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		entry, err = uc.entryRepo.Get(ctx, userID, id)
+		switch {
+		case errors.Is(err, entities.ErrEntryNotFound):
+			uc.logger.Debug("entry not found while updating",
+				zap.String("user_id", userID.String()),
+				zap.String("entry_id", id.String()),
+				zap.Error(err))
+			return err
+		case err != nil:
+			uc.logger.Error("failed to get entry while updating",
+				zap.String("user_id", userID.String()),
+				zap.String("entry_id", id.String()),
+				zap.Error(err))
+			return err
+		}
+		if force {
+			// bypass version validation
+			version = entry.Version
+			uc.logger.Debug("force update",
+				zap.String("user_id", userID.String()),
+				zap.String("entry_id", id.String()))
+		}
+		if err := entry.Update(
+			version,
+			entities.UpdateEntryMeta(request.Meta),
+			entities.UpdateEntryData(encrypted)); err != nil {
+			uc.logger.Debug("failed to update entry because of invalid arguments",
+				zap.String("user_id", userID.String()),
+				zap.String("entry_id", id.String()),
+				zap.Error(err))
+			return err
+		}
+		if err := uc.entryRepo.Update(ctx, entry); err != nil {
+			uc.logger.Error("failed to update entry in storage",
+				zap.String("user_id", userID.String()),
+				zap.String("entry_id", id.String()),
+				zap.Error(err))
+			return err
+		}
+		return nil
+	}); err != nil {
+		uc.logger.Error("failed to update entry in transaction",
+			zap.String("user_id", userID.String()),
+			zap.String("entry_id", id.String()),
+			zap.Error(err))
 		return resp, err
 	}
 	resp.ID = entry.ID

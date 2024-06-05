@@ -33,6 +33,7 @@ service EntryService {
   rpc GetAll (GetAllEntriesRequest) returns (GetAllEntriesResponse);
   rpc Create (CreateEntryRequest) returns (CreateEntryResponse);
   rpc Update (UpdateEntryRequest) returns (UpdateEntryResponse);
+  rpc UpdateForced (UpdateEntryRequest) returns (UpdateEntryResponse);
   rpc Delete (DeleteEntryRequest) returns (DeleteEntryResponse);
 }
 

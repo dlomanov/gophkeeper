@@ -267,6 +267,24 @@ func (s *AppSuite) TestApp() {
 	})
 	require.Error(s.T(), err, "expected error on invalid version")
 	require.Equal(s.T(), codes.AlreadyExists, status.Code(err), "expected invalid argument code")
+	updated, err = entryService.UpdateForced(ctx, &pb.UpdateEntryRequest{
+		Id:      entries[0].Id,
+		Version: 1,
+		Meta:    entries[0].Meta,
+		Data:    entries[0].Data,
+	})
+	require.NoError(s.T(), err, "no error expected on forced update")
+	get, err = entryService.Get(ctx, &pb.GetEntryRequest{Id: entries[0].Id})
+	require.NoError(s.T(), err, "no error expected on get")
+	require.NotNil(s.T(), get, "expected response not nil")
+	require.NotNil(s.T(), get.Entry, "expected entry not nil")
+	assert.Equal(s.T(), entries[0].Id, get.Entry.Id, "get entry id mismatch")
+	assert.Equal(s.T(), entries[0].Key, get.Entry.Key, "get entry key mismatch")
+	assert.Equal(s.T(), entries[0].Type, get.Entry.Type, "get entry type mismatch")
+	assert.True(s.T(), reflect.DeepEqual(entries[0].Meta, get.Entry.Meta), "get entry meta mismatch")
+	assert.Equal(s.T(), entries[0].Data, get.Entry.Data, "get entry data mismatch")
+	assert.Equal(s.T(), updated.Version, get.Entry.Version, "get entry version mismatch")
+
 }
 
 func (s *AppSuite) createGRPCConn() *grpc.ClientConn {

@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestEntryUC(t *testing.T) {
@@ -20,7 +21,7 @@ func TestEntryUC(t *testing.T) {
 	enc, err := encrypto.NewEncrypter([]byte("1234567890123456"))
 	require.NoError(t, err, "no error expected")
 	sut := usecases.NewEntryUC(
-		zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel)),
+		zaptest.NewLogger(t, zaptest.Level(zap.FatalLevel)),
 		NewMockEntryRepo(),
 		enc,
 		NewMockTrmManager())
@@ -53,6 +54,7 @@ func TestEntryUC(t *testing.T) {
 		assert.Equal(t, created.Version, int64(1), "expected version 1 after creation")
 		entries[i].ID = created.ID
 		entries[i].Version = created.Version
+		time.Sleep(time.Millisecond) // for sorting purposes
 	}
 	_, err = sut.Create(ctx, usecases.CreateEntryRequest{
 		Key:    entries[0].Key,
@@ -66,14 +68,16 @@ func TestEntryUC(t *testing.T) {
 	require.NoError(t, err, "no error expected")
 	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
 	for i, entry := range getAll.Entries {
+		entries[i].CreatedAt = entry.CreatedAt
+		entries[i].UpdatedAt = entry.UpdatedAt
 		assert.Equal(t, entries[i].Key, entry.Key, "expected same entry keys")
 		assert.Equal(t, entries[i].UserID, entry.UserID, "expected same user IDs")
 		assert.Equal(t, entries[i].Type, entry.Type, "expected same entry types")
 		assert.True(t, reflect.DeepEqual(entries[i].Meta, entry.Meta), "expected same entry meta")
 		assert.Equal(t, entries[i].Data, entry.Data, "expected same entry data")
 		assert.Equal(t, entries[i].Version, entry.Version, "expected same entry versions")
-		assert.Equal(t, entries[i].CreatedAt.Format("2006-01-02 15:04:05.000"), entry.CreatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry created at")
-		assert.Equal(t, entries[i].UpdatedAt.Format("2006-01-02 15:04:05.000"), entry.UpdatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry updated at")
+		assert.NotEmpty(t, entry.CreatedAt, "expected non-empty created at")
+		assert.NotEmpty(t, entry.UpdatedAt, "expected non-empty created at")
 	}
 
 	// Delete + GetEntries
@@ -105,24 +109,54 @@ func TestEntryUC(t *testing.T) {
 		assert.True(t, reflect.DeepEqual(entries[i].Meta, entry.Meta), "expected same entry meta")
 		assert.Equal(t, entries[i].Data, entry.Data, "expected same entry data")
 		assert.Equal(t, entries[i].Version, entry.Version, "expected same entry versions")
-		assert.Equal(t, entries[i].CreatedAt.Format("2006-01-02 15:04:05.000"), entry.CreatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry created at")
-		assert.Equal(t, entries[i].UpdatedAt.Format("2006-01-02 15:04:05.000"), entry.UpdatedAt.Format("2006-01-02 15:04:05.000"), "expected same entry updated at")
+		assert.Equal(t, entries[i].CreatedAt, entry.CreatedAt, "expected same entry created at")
+		assert.Equal(t, entries[i].UpdatedAt, entry.UpdatedAt, "expected same entry updated at")
 	}
 
 	// Update + Get
 	entries[0].Meta = map[string]string{"updated_test_key": "updated_test_value"}
 	entries[0].Data = []byte("updated_test_data")
-	updated, err := sut.Update(ctx, usecases.UpdateEntryRequest{
+	updateRequest := usecases.UpdateEntryRequest{
 		ID:      entries[0].ID,
 		UserID:  userID1,
-		Version: entries[0].Version,
+		Version: entries[0].Version + 1,
 		Meta:    entries[0].Meta,
 		Data:    entries[0].Data,
-	})
+	}
+	updated, err := sut.Update(ctx, updateRequest)
+	require.Error(t, err, "expected error")
+	require.ErrorIs(t, err, entities.ErrEntryVersionConflict, "expected version conflict error")
+	updateRequest.Version = entries[0].Version
+	updated, err = sut.Update(ctx, updateRequest)
 	require.NoError(t, err, "no error expected")
 	assert.Equal(t, entries[0].Version+1, updated.Version, "expected updated version")
 	entries[0].Version = updated.Version
 	get, err := sut.Get(ctx, usecases.GetEntryRequest{ID: entries[0].ID, UserID: userID1})
+	require.NoError(t, err, "no error expected")
+	assert.Equal(t, get.Entry.ID.String(), updated.ID.String(), "expected same entry")
+	assert.Equal(t, get.Entry.Key, getAll.Entries[0].Key, "expected same entry keys")
+	assert.Equal(t, get.Entry.UserID.String(), getAll.Entries[0].UserID.String(), "expected same user IDs")
+	assert.Equal(t, get.Entry.Type, getAll.Entries[0].Type, "expected same entry types")
+	assert.True(t, reflect.DeepEqual(get.Entry.Meta, entries[0].Meta), "expected same entry meta")
+	assert.Equal(t, get.Entry.Data, entries[0].Data, "expected same entry data")
+	assert.Equal(t, get.Entry.Version, updated.Version, "expected same entry version")
+
+	// UpdateForced
+	entries[0].Meta = map[string]string{"updated_test_key_1": "updated_test_value_1"}
+	entries[0].Data = []byte("updated_test_data_1")
+	updateRequest = usecases.UpdateEntryRequest{
+		ID:      entries[0].ID,
+		UserID:  userID1,
+		Version: entries[0].Version + 10,
+		Meta:    entries[0].Meta,
+		Data:    entries[0].Data,
+	}
+	updated, err = sut.UpdateForced(ctx, updateRequest)
+	require.NoError(t, err, "no error expected")
+	require.NoError(t, err, "no error expected")
+	assert.Equal(t, entries[0].Version+1, updated.Version, "expected updated version")
+	entries[0].Version = updated.Version
+	get, err = sut.Get(ctx, usecases.GetEntryRequest{ID: entries[0].ID, UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	assert.Equal(t, get.Entry.ID.String(), updated.ID.String(), "expected same entry")
 	assert.Equal(t, get.Entry.Key, getAll.Entries[0].Key, "expected same entry keys")
