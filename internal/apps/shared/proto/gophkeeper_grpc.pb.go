@@ -146,12 +146,11 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	EntryService_Get_FullMethodName          = "/proto.EntryService/Get"
-	EntryService_GetAll_FullMethodName       = "/proto.EntryService/GetAll"
-	EntryService_Create_FullMethodName       = "/proto.EntryService/Create"
-	EntryService_Update_FullMethodName       = "/proto.EntryService/Update"
-	EntryService_UpdateForced_FullMethodName = "/proto.EntryService/UpdateForced"
-	EntryService_Delete_FullMethodName       = "/proto.EntryService/Delete"
+	EntryService_Get_FullMethodName    = "/proto.EntryService/Get"
+	EntryService_GetAll_FullMethodName = "/proto.EntryService/GetAll"
+	EntryService_Create_FullMethodName = "/proto.EntryService/Create"
+	EntryService_Update_FullMethodName = "/proto.EntryService/Update"
+	EntryService_Delete_FullMethodName = "/proto.EntryService/Delete"
 )
 
 // EntryServiceClient is the client API for EntryService service.
@@ -162,7 +161,6 @@ type EntryServiceClient interface {
 	GetAll(ctx context.Context, in *GetAllEntriesRequest, opts ...grpc.CallOption) (*GetAllEntriesResponse, error)
 	Create(ctx context.Context, in *CreateEntryRequest, opts ...grpc.CallOption) (*CreateEntryResponse, error)
 	Update(ctx context.Context, in *UpdateEntryRequest, opts ...grpc.CallOption) (*UpdateEntryResponse, error)
-	UpdateForced(ctx context.Context, in *UpdateEntryRequest, opts ...grpc.CallOption) (*UpdateEntryResponse, error)
 	Delete(ctx context.Context, in *DeleteEntryRequest, opts ...grpc.CallOption) (*DeleteEntryResponse, error)
 }
 
@@ -210,15 +208,6 @@ func (c *entryServiceClient) Update(ctx context.Context, in *UpdateEntryRequest,
 	return out, nil
 }
 
-func (c *entryServiceClient) UpdateForced(ctx context.Context, in *UpdateEntryRequest, opts ...grpc.CallOption) (*UpdateEntryResponse, error) {
-	out := new(UpdateEntryResponse)
-	err := c.cc.Invoke(ctx, EntryService_UpdateForced_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *entryServiceClient) Delete(ctx context.Context, in *DeleteEntryRequest, opts ...grpc.CallOption) (*DeleteEntryResponse, error) {
 	out := new(DeleteEntryResponse)
 	err := c.cc.Invoke(ctx, EntryService_Delete_FullMethodName, in, out, opts...)
@@ -236,7 +225,6 @@ type EntryServiceServer interface {
 	GetAll(context.Context, *GetAllEntriesRequest) (*GetAllEntriesResponse, error)
 	Create(context.Context, *CreateEntryRequest) (*CreateEntryResponse, error)
 	Update(context.Context, *UpdateEntryRequest) (*UpdateEntryResponse, error)
-	UpdateForced(context.Context, *UpdateEntryRequest) (*UpdateEntryResponse, error)
 	Delete(context.Context, *DeleteEntryRequest) (*DeleteEntryResponse, error)
 	mustEmbedUnimplementedEntryServiceServer()
 }
@@ -256,9 +244,6 @@ func (UnimplementedEntryServiceServer) Create(context.Context, *CreateEntryReque
 }
 func (UnimplementedEntryServiceServer) Update(context.Context, *UpdateEntryRequest) (*UpdateEntryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
-}
-func (UnimplementedEntryServiceServer) UpdateForced(context.Context, *UpdateEntryRequest) (*UpdateEntryResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateForced not implemented")
 }
 func (UnimplementedEntryServiceServer) Delete(context.Context, *DeleteEntryRequest) (*DeleteEntryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
@@ -348,24 +333,6 @@ func _EntryService_Update_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EntryService_UpdateForced_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateEntryRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EntryServiceServer).UpdateForced(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: EntryService_UpdateForced_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EntryServiceServer).UpdateForced(ctx, req.(*UpdateEntryRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _EntryService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteEntryRequest)
 	if err := dec(in); err != nil {
@@ -406,10 +373,6 @@ var EntryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Update",
 			Handler:    _EntryService_Update_Handler,
-		},
-		{
-			MethodName: "UpdateForced",
-			Handler:    _EntryService_UpdateForced_Handler,
 		},
 		{
 			MethodName: "Delete",

@@ -6,7 +6,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/config"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entrypoints/grpc"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/deps"
-	grpcserver2 "github.com/dlomanov/gophkeeper/internal/apps/server/infra/grpcserver"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/grpcserver"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
 	"github.com/dlomanov/gophkeeper/internal/infra/logging"
 	"github.com/dlomanov/gophkeeper/internal/infra/pg/migrator"
@@ -19,7 +19,7 @@ import (
 )
 
 func Run(ctx context.Context, config *config.Config) error {
-	if err := config.Valid(); err != nil {
+	if err := config.Validate(); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
 	}
 
@@ -69,25 +69,25 @@ func closeContainer(c *deps.Container) {
 	}
 }
 
-func startGRPC(ctx context.Context, c *deps.Container) *grpcserver2.Server {
-	opts := []grpcserver2.Option{
-		grpcserver2.Addr(c.Config.Address),
-		grpcserver2.ShutdownTimeout(15 * time.Second),
-		grpcserver2.TLSCert(c.Config.Cert, c.Config.CertKey),
+func startGRPC(ctx context.Context, c *deps.Container) *grpcserver.Server {
+	opts := []grpcserver.Option{
+		grpcserver.Addr(c.Config.Address),
+		grpcserver.ShutdownTimeout(15 * time.Second),
+		grpcserver.TLSCert(c.Config.Cert, c.Config.CertKey),
 		grpc.GetOptions(c),
 	}
 
-	if value := ctx.Value(grpcserver2.ListenerKey); value != nil {
+	if value := ctx.Value(grpcserver.ListenerKey); value != nil {
 		c.Logger.Debug("GRPC-server custom listener detected")
 		if l, ok := value.(net.Listener); ok {
-			opts = append(opts, grpcserver2.Listener(l))
+			opts = append(opts, grpcserver.Listener(l))
 			c.Logger.Debug("GRPC-server starts with custom listener")
 		} else {
 			c.Logger.Debug("GRPC-server custom listener is not net.Listener")
 		}
 	}
 
-	s := grpcserver2.New(opts...)
+	s := grpcserver.New(opts...)
 	grpc.UseServices(s, c)
 	c.Logger.Debug("GRPC-server started")
 	return s
@@ -96,7 +96,7 @@ func startGRPC(ctx context.Context, c *deps.Container) *grpcserver2.Server {
 func wait(
 	ctx context.Context,
 	c *deps.Container,
-	grpcserv *grpcserver2.Server,
+	grpcserv *grpcserver.Server,
 ) {
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, syscall.SIGINT, syscall.SIGTERM)
@@ -110,7 +110,7 @@ func wait(
 	}
 }
 
-func shutdownGRPC(c *deps.Container, s *grpcserver2.Server) {
+func shutdownGRPC(c *deps.Container, s *grpcserver.Server) {
 	c.Logger.Debug("GRPC-server shutdown")
 	if err := s.Shutdown(); err != nil {
 		c.Logger.Error("GRPC-server shutdown error", zap.Error(err))

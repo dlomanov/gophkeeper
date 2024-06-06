@@ -128,7 +128,7 @@ func TestNewEntry(t *testing.T) {
 	}
 }
 
-func TestUpdate(t *testing.T) {
+func TestUpdateVersion(t *testing.T) {
 	tests := []struct {
 		name     string
 		data     []byte
@@ -165,7 +165,7 @@ func TestUpdate(t *testing.T) {
 				UpdatedAt: now,
 			}
 			srcVersion := entry.Version
-			errs := entry.Update(
+			errs := entry.UpdateVersion(
 				entry.Version,
 				entities.UpdateEntryData(tt.data),
 				entities.UpdateEntryMeta(tt.meta))
@@ -186,18 +186,18 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
-func TestUpdate_nonOptions(t *testing.T) {
+func TestUpdateVersion_nonOptions(t *testing.T) {
 	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
 	require.NoError(t, err, "failed to create entry")
-	err = entry.Update(entry.Version)
+	err = entry.UpdateVersion(entry.Version)
 	require.NoError(t, err)
 	assert.Equal(t, entry.CreatedAt, entry.UpdatedAt, "created at should be equal to updated at")
 }
 
-func TestUpdate_invalidOptions(t *testing.T) {
+func TestUpdateVersion_invalidOptions(t *testing.T) {
 	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
 	require.NoError(t, err, "failed to create entry")
-	errs := entry.Update(entry.Version,
+	errs := entry.UpdateVersion(entry.Version,
 		entities.UpdateEntryData(nil),
 		entities.UpdateEntryData([]byte(strings.Repeat("s", entities.EntryMaxDataSize+1))),
 	)
@@ -205,9 +205,9 @@ func TestUpdate_invalidOptions(t *testing.T) {
 	require.ErrorIs(t, errs, entities.ErrEntryDataSizeExceeded, "want data size exceeded error")
 }
 
-func TestUpdate_versionConflict(t *testing.T) {
+func TestUpdateVersion_versionConflict(t *testing.T) {
 	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
 	require.NoError(t, err, "failed to create entry")
-	errs := entry.Update(entry.Version-1, entities.UpdateEntryData([]byte("test1")))
+	errs := entry.UpdateVersion(entry.Version-1, entities.UpdateEntryData([]byte("test1")))
 	require.ErrorIs(t, errs, entities.ErrEntryVersionConflict, "want version conflict error")
 }

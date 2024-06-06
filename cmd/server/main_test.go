@@ -27,6 +27,7 @@ import (
 	"io"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -256,35 +257,31 @@ func (s *AppSuite) TestApp() {
 	assert.Equal(s.T(), entries[0].Data, get.Entry.Data, "get entry data mismatch")
 	assert.Equal(s.T(), updated.Version, get.Entry.Version, "get entry version mismatch")
 
-	// 3 Version validation
+	// 3 Conflict resolution
 	entries[0].Meta["updated_key"] = "updated_value"
 	entries[0].Data = []byte("updated_data")
-	_, err = entryService.Update(ctx, &pb.UpdateEntryRequest{
+	entries[0].Version = entries[0].Version + 10
+	conflict, err := entryService.Update(ctx, &pb.UpdateEntryRequest{
 		Id:      entries[0].Id,
-		Version: 1,
+		Version: entries[0].Version,
 		Meta:    entries[0].Meta,
 		Data:    entries[0].Data,
 	})
-	require.Error(s.T(), err, "expected error on invalid version")
-	require.Equal(s.T(), codes.AlreadyExists, status.Code(err), "expected invalid argument code")
-	updated, err = entryService.UpdateForced(ctx, &pb.UpdateEntryRequest{
-		Id:      entries[0].Id,
-		Version: 1,
-		Meta:    entries[0].Meta,
-		Data:    entries[0].Data,
-	})
-	require.NoError(s.T(), err, "no error expected on forced update")
-	get, err = entryService.Get(ctx, &pb.GetEntryRequest{Id: entries[0].Id})
+	require.NoError(s.T(), err, "no error expected on update")
+	require.NotEqual(s.T(), entries[0].Id, conflict.Id, "expected updated id to be different")
+	require.NotEqual(s.T(), entries[0].Version, conflict.Version, "expected updated version to be different")
+	require.Equal(s.T(), int64(1), conflict.Version, "expected conflict version to be 1")
+	get, err = entryService.Get(ctx, &pb.GetEntryRequest{Id: conflict.Id})
 	require.NoError(s.T(), err, "no error expected on get")
 	require.NotNil(s.T(), get, "expected response not nil")
 	require.NotNil(s.T(), get.Entry, "expected entry not nil")
-	assert.Equal(s.T(), entries[0].Id, get.Entry.Id, "get entry id mismatch")
-	assert.Equal(s.T(), entries[0].Key, get.Entry.Key, "get entry key mismatch")
+	assert.Equal(s.T(), conflict.Id, get.Entry.Id, "get entry id mismatch")
+	assert.NotEqual(s.T(), entries[0].Key, get.Entry.Key, "get entry key mismatch")
+	assert.True(s.T(), strings.HasPrefix(get.Entry.Key, entries[0].Key), "get entry key prefix mismatch")
 	assert.Equal(s.T(), entries[0].Type, get.Entry.Type, "get entry type mismatch")
 	assert.True(s.T(), reflect.DeepEqual(entries[0].Meta, get.Entry.Meta), "get entry meta mismatch")
 	assert.Equal(s.T(), entries[0].Data, get.Entry.Data, "get entry data mismatch")
-	assert.Equal(s.T(), updated.Version, get.Entry.Version, "get entry version mismatch")
-
+	assert.Equal(s.T(), conflict.Version, get.Entry.Version, "get entry version mismatch")
 }
 
 func (s *AppSuite) createGRPCConn() *grpc.ClientConn {

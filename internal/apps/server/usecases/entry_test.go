@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -119,15 +120,11 @@ func TestEntryUC(t *testing.T) {
 	updateRequest := usecases.UpdateEntryRequest{
 		ID:      entries[0].ID,
 		UserID:  userID1,
-		Version: entries[0].Version + 1,
+		Version: entries[0].Version,
 		Meta:    entries[0].Meta,
 		Data:    entries[0].Data,
 	}
 	updated, err := sut.Update(ctx, updateRequest)
-	require.Error(t, err, "expected error")
-	require.ErrorIs(t, err, entities.ErrEntryVersionConflict, "expected version conflict error")
-	updateRequest.Version = entries[0].Version
-	updated, err = sut.Update(ctx, updateRequest)
 	require.NoError(t, err, "no error expected")
 	assert.Equal(t, entries[0].Version+1, updated.Version, "expected updated version")
 	entries[0].Version = updated.Version
@@ -141,30 +138,38 @@ func TestEntryUC(t *testing.T) {
 	assert.Equal(t, get.Entry.Data, entries[0].Data, "expected same entry data")
 	assert.Equal(t, get.Entry.Version, updated.Version, "expected same entry version")
 
-	// UpdateForced
-	entries[0].Meta = map[string]string{"updated_test_key_1": "updated_test_value_1"}
-	entries[0].Data = []byte("updated_test_data_1")
+	// Update conflict resolving
+	updateEntry := *entries[0]
+	updateEntry.Meta = map[string]string{"updated_test_key_1": "updated_test_value_1"}
+	updateEntry.Data = []byte("updated_test_data_1")
 	updateRequest = usecases.UpdateEntryRequest{
-		ID:      entries[0].ID,
+		ID:      updateEntry.ID,
 		UserID:  userID1,
-		Version: entries[0].Version + 10,
-		Meta:    entries[0].Meta,
-		Data:    entries[0].Data,
+		Version: updateEntry.Version + 10,
+		Meta:    updateEntry.Meta,
+		Data:    updateEntry.Data,
 	}
-	updated, err = sut.UpdateForced(ctx, updateRequest)
+	conflict, err := sut.Update(ctx, updateRequest)
 	require.NoError(t, err, "no error expected")
+	assert.Equal(t, int64(1), conflict.Version, "expected conflict version == 1")
+	assert.NotEqual(t, conflict.ID.String(), updateEntry.ID.String(), "expected conflict ID != entry ID")
+	get, err = sut.Get(ctx, usecases.GetEntryRequest{ID: conflict.ID, UserID: userID1})
 	require.NoError(t, err, "no error expected")
-	assert.Equal(t, entries[0].Version+1, updated.Version, "expected updated version")
-	entries[0].Version = updated.Version
-	get, err = sut.Get(ctx, usecases.GetEntryRequest{ID: entries[0].ID, UserID: userID1})
+	assert.Equal(t, get.Entry.ID.String(), conflict.ID.String(), "expected same entry")
+	assert.NotEqual(t, get.Entry.Key, updateEntry.Key, "expected conflict key != entry key")
+	assert.True(t, strings.HasPrefix(get.Entry.Key, updateEntry.Key), "expected entry key prefix")
+	assert.Equal(t, get.Entry.UserID.String(), updateEntry.UserID.String(), "expected same user IDs")
+	assert.Equal(t, get.Entry.Type, updateEntry.Type, "expected same entry types")
+	assert.True(t, reflect.DeepEqual(get.Entry.Meta, updateEntry.Meta), "expected same entry meta")
+	assert.Equal(t, get.Entry.Data, updateEntry.Data, "expected same entry data")
+	assert.Equal(t, get.Entry.Version, conflict.Version, "expected same entry version")
+	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
-	assert.Equal(t, get.Entry.ID.String(), updated.ID.String(), "expected same entry")
-	assert.Equal(t, get.Entry.Key, getAll.Entries[0].Key, "expected same entry keys")
-	assert.Equal(t, get.Entry.UserID.String(), getAll.Entries[0].UserID.String(), "expected same user IDs")
-	assert.Equal(t, get.Entry.Type, getAll.Entries[0].Type, "expected same entry types")
-	assert.True(t, reflect.DeepEqual(get.Entry.Meta, entries[0].Meta), "expected same entry meta")
-	assert.Equal(t, get.Entry.Data, entries[0].Data, "expected same entry data")
-	assert.Equal(t, get.Entry.Version, updated.Version, "expected same entry version")
+	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
+	conflictIndex := slices.IndexFunc(getAll.Entries, func(e entities.Entry) bool { return e.ID == conflict.ID })
+	require.GreaterOrEqual(t, conflictIndex, 0, "expected conflict entry in list")
+	originIndex := slices.IndexFunc(getAll.Entries, func(e entities.Entry) bool { return e.ID == updateEntry.ID })
+	require.GreaterOrEqual(t, originIndex, 0, "expected origin entry in list")
 
 	// GetNewestEntries
 	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})

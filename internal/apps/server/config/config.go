@@ -21,7 +21,7 @@ type (
 	}
 )
 
-func (c Config) Valid() error {
+func (c Config) Validate() error {
 	var errs []error
 	if c.Address == "" {
 		errs = append(errs, errors.New("GRPC-server address should be specified"))

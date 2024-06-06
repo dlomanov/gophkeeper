@@ -158,49 +158,6 @@ func (s *EntryService) Update(
 	var (
 		invalid  *apperrors.AppErrorInvalid
 		notFound *apperrors.AppErrorNotFound
-		conflict *apperrors.AppErrorConflict
-	)
-	switch {
-	case errors.As(err, &invalid):
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	case errors.As(err, &notFound):
-		return nil, status.Error(codes.NotFound, err.Error())
-	case errors.As(err, &conflict):
-		return nil, status.Error(codes.AlreadyExists, err.Error())
-	case err != nil:
-		s.logger.Error("failed to update entry",
-			zap.String("user_id", userID.String()),
-			zap.String("entry_id", request.Id),
-			zap.Error(err))
-		return nil, status.Error(codes.Internal, "internal server error")
-	}
-
-	return &pb.UpdateEntryResponse{
-		Id:      updated.ID.String(),
-		Version: updated.Version,
-	}, nil
-}
-
-func (s *EntryService) UpdateForced(
-	ctx context.Context,
-	request *pb.UpdateEntryRequest,
-) (*pb.UpdateEntryResponse, error) {
-	userID, ok := interceptor.GetUserID(ctx)
-	if !ok {
-		s.logger.Debug("user id not found in context")
-		return nil, status.Error(codes.Unauthenticated, entities.ErrUserIDInvalid.Error())
-	}
-
-	updated, err := s.entryUC.UpdateForced(ctx, usecases.UpdateEntryRequest{
-		ID:      s.parseUUID(request.Id),
-		UserID:  userID,
-		Meta:    request.Meta,
-		Data:    request.Data,
-		Version: request.Version,
-	})
-	var (
-		invalid  *apperrors.AppErrorInvalid
-		notFound *apperrors.AppErrorNotFound
 	)
 	switch {
 	case errors.As(err, &invalid):

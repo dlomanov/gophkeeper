@@ -13,8 +13,9 @@ const (
 
 type (
 	Config struct {
-		Level string
-		Type  string
+		Level       string
+		Type        string
+		OutputPaths []string
 	}
 	LogType string
 )
@@ -36,5 +37,8 @@ func NewLogger(config Config) (*zap.Logger, error) {
 	}
 
 	c.Level = lvl
+	if len(config.OutputPaths) != 0 {
+		c.OutputPaths = config.OutputPaths
+	}
 	return c.Build()
 }

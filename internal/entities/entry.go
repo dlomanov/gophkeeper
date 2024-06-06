@@ -88,24 +88,19 @@ func NewEntry(
 	}, nil
 }
 
-func (e *Entry) Update(version int64, opts ...EntryUpdateOption) error {
+func (e *Entry) UpdateVersion(version int64, opts ...EntryUpdateOption) error {
 	if version != e.Version {
-		return fmt.Errorf("%w: %d != %d", ErrEntryVersionConflict, version, e.Version)
+		return fmt.Errorf("entry: version conflict: %w: %d != %d", ErrEntryVersionConflict, version, e.Version)
 	}
-	if len(opts) == 0 {
-		return nil
-	}
-
-	var err error
-	for _, opt := range opts {
-		err = multierr.Append(err, opt(e))
-	}
-	if err != nil {
+	if err := e.update(opts...); err != nil {
 		return err
 	}
-	e.UpdatedAt = time.Now().UTC()
 	e.Version++
 	return nil
+}
+
+func (e *Entry) Update(opts ...EntryUpdateOption) error {
+	return e.update(opts...)
 }
 
 func UpdateEntryData(data []byte) EntryUpdateOption {
@@ -126,4 +121,20 @@ func UpdateEntryMeta(meta map[string]string) EntryUpdateOption {
 		e.Meta = meta
 		return nil
 	}
+}
+
+func (e *Entry) update(opts ...EntryUpdateOption) error {
+	if len(opts) == 0 {
+		return nil
+	}
+
+	var err error
+	for _, opt := range opts {
+		err = multierr.Append(err, opt(e))
+	}
+	if err != nil {
+		return fmt.Errorf("entry: failed to update: %w", err)
+	}
+	e.UpdatedAt = time.Now().UTC()
+	return nil
 }
