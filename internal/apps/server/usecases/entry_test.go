@@ -2,6 +2,7 @@ package usecases_test
 
 import (
 	"context"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/diff"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
 	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/dlomanov/gophkeeper/internal/infra/encrypto"
@@ -19,11 +20,13 @@ import (
 
 func TestEntryUC(t *testing.T) {
 	ctx := context.Background()
+	merger := diff.NewEntry()
 	enc, err := encrypto.NewEncrypter([]byte("1234567890123456"))
 	require.NoError(t, err, "no error expected")
 	sut := usecases.NewEntryUC(
 		zaptest.NewLogger(t, zaptest.Level(zap.FatalLevel)),
 		NewMockEntryRepo(),
+		merger,
 		enc,
 		NewMockTrmManager())
 	userID1 := uuid.New()
@@ -171,50 +174,37 @@ func TestEntryUC(t *testing.T) {
 	originIndex := slices.IndexFunc(getAll.Entries, func(e entities.Entry) bool { return e.ID == updateEntry.ID })
 	require.GreaterOrEqual(t, originIndex, 0, "expected origin entry in list")
 
-	// GetNewestEntries
+	// GetEntriesDiff
 	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
-	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
-	entries[0].Meta = map[string]string{"updated_test_key": "updated_test_value"}
-	entries[0].Data = []byte("updated_test_data")
-	updated, err = sut.Update(ctx, usecases.UpdateEntryRequest{
-		ID:      entries[0].ID,
-		UserID:  userID1,
-		Version: entries[0].Version,
-		Meta:    entries[0].Meta,
-		Data:    entries[0].Data,
-	})
-	require.NoError(t, err, "no error expected")
-	entries[0].Version = updated.Version
-	versions := make(map[string]int64, len(getAll.Entries))
-	for _, v := range getAll.Entries {
-		versions[v.ID.String()] = v.Version
+	versions := make([]entities.EntryVersion, len(getAll.Entries))
+	for i, v := range getAll.Entries {
+		versions[i] = entities.EntryVersion{ID: v.ID, Version: v.Version}
 	}
-	newest, err := sut.GetNewestEntries(ctx, usecases.GetNewestEntriesRequest{UserID: userID1, Versions: versions})
+	versions[len(versions)-1] = entities.EntryVersion{ID: uuid.New(), Version: 1} // server does not have this entry
+	versions[0].Version = versions[0].Version + 10
+	getDiff, err := sut.GetEntriesDiff(ctx, usecases.GetEntriesDiffRequest{UserID: userID1, Versions: versions})
 	require.NoError(t, err, "no error expected")
-	require.Len(t, newest.Entries, 1, "expected one entry")
-	assert.Equal(t, newest.Entries[0].ID.String(), entries[0].ID.String(), "expected same entry")
-	assert.Equal(t, newest.Entries[0].Key, entries[0].Key, "expected same entry keys")
-	assert.Equal(t, newest.Entries[0].UserID.String(), entries[0].UserID.String(), "expected same user IDs")
-	assert.Equal(t, newest.Entries[0].Type, entries[0].Type, "expected same entry types")
-	assert.True(t, reflect.DeepEqual(newest.Entries[0].Meta, entries[0].Meta), "expected same entry meta")
-	assert.Equal(t, newest.Entries[0].Data, entries[0].Data, "expected same entry data")
-	assert.Equal(t, newest.Entries[0].Version, entries[0].Version, "expected same entry version")
-
-	// GetNewestEntries (empty versions)
-	versions = nil
-	newest, err = sut.GetNewestEntries(ctx, usecases.GetNewestEntriesRequest{UserID: userID1, Versions: versions})
-	require.NoError(t, err, "no error expected")
-	require.Equal(t, len(getAll.Entries), len(newest.Entries), "expected one entry")
+	require.Len(t, getDiff.Entries, 2, "expected non-empty list")
+	require.Len(t, getDiff.CreateIDs, 1, "expected non-empty list")
+	require.Len(t, getDiff.UpdateIDs, 1, "expected non-empty list")
+	require.Len(t, getDiff.DeleteIDs, 1, "expected non-empty list")
+	require.Equal(t, getDiff.CreateIDs[0], getAll.Entries[len(getAll.Entries)-1].ID, "expected same entry")
+	require.Equal(t, getDiff.DeleteIDs[0], versions[len(versions)-1].ID, "expected same entry")
+	require.Equal(t, getDiff.UpdateIDs[0], versions[0].ID, "expected same entry")
+	require.True(t, slices.ContainsFunc(getDiff.Entries, func(entry entities.Entry) bool { return entry.ID == getDiff.UpdateIDs[0] }), "expected entry in list")
+	require.True(t, slices.ContainsFunc(getDiff.Entries, func(entry entities.Entry) bool { return entry.ID == getDiff.CreateIDs[0] }), "expected entry in list")
 }
 
 func TestEntryUC_validation(t *testing.T) {
 	ctx := context.Background()
 	enc, err := encrypto.NewEncrypter([]byte("1234567890123456"))
+	merger := diff.NewEntry()
 	require.NoError(t, err, "no error expected")
 	sut := usecases.NewEntryUC(
 		zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel)),
 		NewMockEntryRepo(),
+		merger,
 		enc,
 		NewMockTrmManager())
 
@@ -223,7 +213,7 @@ func TestEntryUC_validation(t *testing.T) {
 	_, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: uuid.Nil})
 	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
 
-	_, err = sut.GetNewestEntries(ctx, usecases.GetNewestEntriesRequest{UserID: uuid.Nil, Versions: nil})
+	_, err = sut.GetEntriesDiff(ctx, usecases.GetEntriesDiffRequest{UserID: uuid.Nil, Versions: nil})
 	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
 
 	_, err = sut.Get(ctx, usecases.GetEntryRequest{ID: uuid.Nil, UserID: uuid.Nil})

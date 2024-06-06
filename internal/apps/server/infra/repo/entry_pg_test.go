@@ -115,7 +115,7 @@ func (s *EntryTestSuit) TestEntryRepo() {
 	require.NoError(s.T(), err, "no error expected when getting entry")
 	s.assertEquals(s.T(), entries[0], resultEntry)
 
-	// GetVersions and GetByIds
+	// GetVersions and GetByIDs
 	getAll, err = entryRepo.GetAll(ctx, user.ID)
 	require.NoError(s.T(), err, "no error expected when getting entries")
 	versions, err := entryRepo.GetVersions(ctx, user.ID)
@@ -130,7 +130,7 @@ func (s *EntryTestSuit) TestEntryRepo() {
 		entryIds[i] = version.ID
 	}
 	entryIds = entryIds[:len(entryIds)-1]
-	getByIds, err := entryRepo.GetByIds(ctx, user.ID, entryIds)
+	getByIds, err := entryRepo.GetByIDs(ctx, user.ID, entryIds)
 	require.NoError(s.T(), err, "no error expected when getting entries")
 	require.Equal(s.T(), len(entryIds), len(getByIds), "expected same number of entries and versions")
 	compared := 0

@@ -13,19 +13,32 @@ import (
 
 type (
 	EntryUC struct {
-		logger    *zap.Logger
-		entryRepo EntryRepo
-		encrypter Encrypter
-		tx        trm.Manager
+		logger      *zap.Logger
+		entryRepo   EntryRepo
+		entryDiffer EntryDiffer
+		encrypter   Encrypter
+		tx          trm.Manager
 	}
 	EntryRepo interface {
 		Get(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entities.Entry, error)
 		GetAll(ctx context.Context, userID uuid.UUID) ([]entities.Entry, error)
-		GetByIds(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]entities.Entry, error)
+		GetByIDs(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]entities.Entry, error)
 		GetVersions(ctx context.Context, userID uuid.UUID) ([]entities.EntryVersion, error)
 		Create(ctx context.Context, entry *entities.Entry) error
 		Update(ctx context.Context, entry *entities.Entry) error
 		Delete(ctx context.Context, userID uuid.UUID, id uuid.UUID) error
+	}
+	EntryDiffer interface {
+		GetDiff(
+			ctx context.Context,
+			serverVersions []entities.EntryVersion,
+			clientVersions []entities.EntryVersion,
+		) (
+			createIDs []uuid.UUID,
+			updateIDs []uuid.UUID,
+			deleteIDs []uuid.UUID,
+			err error,
+		)
 	}
 	Encrypter interface {
 		Encrypt(data []byte) ([]byte, error)
@@ -35,12 +48,15 @@ type (
 		UserID uuid.UUID
 		ID     uuid.UUID
 	}
-	GetNewestEntriesRequest struct {
+	GetEntriesDiffRequest struct {
 		UserID   uuid.UUID
-		Versions map[string]int64
+		Versions []entities.EntryVersion
 	}
-	GetNewestEntriesResponse struct {
-		Entries []entities.Entry
+	GetEntriesDiffResponse struct {
+		Entries   []entities.Entry
+		CreateIDs []uuid.UUID
+		UpdateIDs []uuid.UUID
+		DeleteIDs []uuid.UUID
 	}
 	GetEntryResponse struct {
 		Entry *entities.Entry
@@ -86,14 +102,16 @@ type (
 func NewEntryUC(
 	logger *zap.Logger,
 	entryRepo EntryRepo,
+	entryDiffer EntryDiffer,
 	encrypter Encrypter,
 	tx trm.Manager,
 ) *EntryUC {
 	return &EntryUC{
-		logger:    logger,
-		entryRepo: entryRepo,
-		encrypter: encrypter,
-		tx:        tx,
+		logger:      logger,
+		entryRepo:   entryRepo,
+		entryDiffer: entryDiffer,
+		encrypter:   encrypter,
+		tx:          tx,
 	}
 }
 
@@ -167,42 +185,39 @@ func (uc *EntryUC) GetEntries(
 	return response, nil
 }
 
-func (uc *EntryUC) GetNewestEntries(
+func (uc *EntryUC) GetEntriesDiff(
 	ctx context.Context,
-	request GetNewestEntriesRequest,
-) (response GetNewestEntriesResponse, err error) {
+	request GetEntriesDiffRequest,
+) (response GetEntriesDiffResponse, err error) {
 	if err := request.validate(); err != nil {
 		return response, fmt.Errorf("get all entries: invalid request: %w", err)
 	}
-	userID := request.UserID
-
-	versions, err := uc.entryRepo.GetVersions(ctx, userID)
-	if err != nil {
-		uc.logger.Error("failed to get versions",
-			zap.String("user_id", userID.String()),
-			zap.Error(err))
-		return response, err
-	}
-	if len(versions) == 0 {
-		return response, nil
-	}
-	var entryIds []uuid.UUID
-	for _, v := range versions {
-		if version, ok := request.Versions[v.ID.String()]; ok {
-			if version != v.Version { // server wins
-				entryIds = append(entryIds, v.ID)
-			}
-			continue
+	var (
+		userID    = request.UserID
+		createIDs []uuid.UUID
+		updateIDs []uuid.UUID
+		deleteIDs []uuid.UUID
+		entries   []entities.Entry
+	)
+	if err := uc.tx.Do(ctx, func(ctx context.Context) error {
+		versions, err := uc.entryRepo.GetVersions(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("get_entries_diff: failed to get versions from storage: %w", err)
 		}
-		entryIds = append(entryIds, v.ID)
-	}
-	if len(entryIds) == 0 {
-		return response, nil
-	}
-
-	entries, err := uc.entryRepo.GetByIds(ctx, userID, entryIds)
-	if err != nil {
-		uc.logger.Error("failed to get entries",
+		createIDs, updateIDs, deleteIDs, err = uc.entryDiffer.GetDiff(ctx, versions, request.Versions)
+		if err != nil {
+			return fmt.Errorf("get_entries_diff: failed to diff versions: %w", err)
+		}
+		entryIDs := make([]uuid.UUID, 0, len(createIDs)+len(updateIDs))
+		entryIDs = append(entryIDs, createIDs...)
+		entryIDs = append(entryIDs, updateIDs...)
+		entries, err = uc.entryRepo.GetByIDs(ctx, userID, entryIDs)
+		if err != nil {
+			return fmt.Errorf("get_entries_diff: failed to get entries from storage: %w", err)
+		}
+		return nil
+	}); err != nil {
+		uc.logger.Error("failed to calculate diff",
 			zap.String("user_id", userID.String()),
 			zap.Error(err))
 		return response, err
@@ -217,6 +232,9 @@ func (uc *EntryUC) GetNewestEntries(
 		}
 		entries[i].Data = decrypted
 	}
+	response.CreateIDs = createIDs
+	response.UpdateIDs = updateIDs
+	response.DeleteIDs = deleteIDs
 	response.Entries = entries
 
 	return response, nil
@@ -376,14 +394,14 @@ func (r GetEntryRequest) validate() error {
 	return err
 }
 
-func (r GetNewestEntriesRequest) validate() error {
+func (r GetEntriesRequest) validate() error {
 	if r.UserID == uuid.Nil {
 		return entities.ErrUserIDInvalid
 	}
 	return nil
 }
 
-func (r GetEntriesRequest) validate() error {
+func (r GetEntriesDiffRequest) validate() error {
 	if r.UserID == uuid.Nil {
 		return entities.ErrUserIDInvalid
 	}

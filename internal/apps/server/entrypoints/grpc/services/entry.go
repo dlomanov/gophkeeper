@@ -70,8 +70,8 @@ func (s *EntryService) Get(
 
 func (s *EntryService) GetAll(
 	ctx context.Context,
-	_ *pb.GetAllEntriesRequest,
-) (*pb.GetAllEntriesResponse, error) {
+	_ *pb.GetEntriesRequest,
+) (*pb.GetEntriesResponse, error) {
 	userID, ok := interceptor.GetUserID(ctx)
 	if !ok {
 		s.logger.Debug("user id not found in context")
@@ -96,7 +96,61 @@ func (s *EntryService) GetAll(
 	for i, entry := range got.Entries {
 		entries[i] = s.toAPIEntry(entry)
 	}
-	return &pb.GetAllEntriesResponse{Entries: entries}, nil
+	return &pb.GetEntriesResponse{Entries: entries}, nil
+}
+
+func (s *EntryService) GetDiff(
+	ctx context.Context,
+	request *pb.GetEntriesDiffRequest,
+) (*pb.GetEntriesDiffResponse, error) {
+	userID, ok := interceptor.GetUserID(ctx)
+	if !ok {
+		s.logger.Debug("user id not found in context")
+		return nil, status.Error(codes.Unauthenticated, entities.ErrUserIDInvalid.Error())
+	}
+
+	versions := s.toEntityVersions(request.Versions)
+	got, err := s.entryUC.GetEntriesDiff(ctx, usecases.GetEntriesDiffRequest{
+		UserID:   userID,
+		Versions: versions,
+	})
+	var (
+		invalid *apperrors.AppErrorInvalid
+	)
+	switch {
+	case errors.As(err, &invalid):
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	case err != nil:
+		s.logger.Error("failed to get entries diff",
+			zap.String("user_id", userID.String()),
+			zap.Error(err))
+		return nil, status.Error(codes.Internal, "internal server error")
+	}
+
+	var (
+		entries   = make([]*pb.Entry, len(got.Entries))
+		createIDs = make([]string, len(got.CreateIDs))
+		updateIDs = make([]string, len(got.UpdateIDs))
+		deleteIDs = make([]string, len(got.DeleteIDs))
+	)
+	for i, entry := range got.Entries {
+		entries[i] = s.toAPIEntry(entry)
+	}
+	for i, id := range got.CreateIDs {
+		createIDs[i] = id.String()
+	}
+	for i, id := range got.UpdateIDs {
+		updateIDs[i] = id.String()
+	}
+	for i, id := range got.DeleteIDs {
+		deleteIDs[i] = id.String()
+	}
+	return &pb.GetEntriesDiffResponse{
+		Entries:   entries,
+		CreateIds: createIDs,
+		UpdateIds: updateIDs,
+		DeleteIds: deleteIDs,
+	}, nil
 }
 
 func (s *EntryService) Create(
@@ -254,6 +308,17 @@ func (s *EntryService) toEntityType(typ pb.EntryType) entities.EntryType {
 	default:
 		return entities.EntryTypeUnspecified
 	}
+}
+
+func (s *EntryService) toEntityVersions(versions []*pb.EntryVersion) []entities.EntryVersion {
+	result := make([]entities.EntryVersion, 0, len(versions))
+	for _, v := range versions {
+		result = append(result, entities.EntryVersion{
+			ID:      s.parseUUID(v.Id),
+			Version: v.Version,
+		})
+	}
+	return result
 }
 
 func (s *EntryService) parseUUID(value string) uuid.UUID {

@@ -107,11 +107,15 @@ func (r *MockEntryRepo) GetAll(_ context.Context, userID uuid.UUID) ([]entities.
 	return entries, nil
 }
 
-func (r *MockEntryRepo) GetByIds(
+func (r *MockEntryRepo) GetByIDs(
 	ctx context.Context,
 	userID uuid.UUID,
 	ids []uuid.UUID,
 ) ([]entities.Entry, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
 	entries, err := r.GetAll(ctx, userID)
 	if err != nil {
 		return nil, err

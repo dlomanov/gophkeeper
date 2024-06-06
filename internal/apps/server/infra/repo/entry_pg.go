@@ -90,11 +90,14 @@ func (r *EntryRepo) GetVersions(ctx context.Context, userID uuid.UUID) ([]entiti
 	return r.toEntryVersions(rows)
 }
 
-func (r *EntryRepo) GetByIds(
+func (r *EntryRepo) GetByIDs(
 	ctx context.Context,
 	userID uuid.UUID,
 	entryIds []uuid.UUID,
 ) ([]entities.Entry, error) {
+	if len(entryIds) == 0 {
+		return nil, nil
+	}
 	var rows []entryRow
 	err := r.getDB(ctx).SelectContext(ctx, &rows, `
 		SELECT id, user_id, key, type, meta, data, version, created_at, updated_at

@@ -27,6 +27,7 @@ import (
 	"io"
 	"net"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -153,12 +154,12 @@ func (s *AppSuite) TestApp() {
 
 	// 2 Entries
 	entryService := pb.NewEntryServiceClient(conn)
-	_, err = entryService.GetAll(ctx, &pb.GetAllEntriesRequest{})
+	_, err = entryService.GetAll(ctx, &pb.GetEntriesRequest{})
 	require.Error(s.T(), err, "expected error")
 	require.Equal(s.T(), codes.Unauthenticated, status.Code(err), "expected unauthenticated code")
 
 	ctx = metadata.AppendToOutgoingContext(ctx, sharedmd.NewTokenKV(signInResp.Token)...)
-	getAll, err := entryService.GetAll(ctx, &pb.GetAllEntriesRequest{})
+	getAll, err := entryService.GetAll(ctx, &pb.GetEntriesRequest{})
 	require.NoError(s.T(), err, "no error expected")
 	require.NotNil(s.T(), getAll, "expected response not nil")
 	require.Empty(s.T(), getAll.Entries, "expected empty entries response")
@@ -189,7 +190,7 @@ func (s *AppSuite) TestApp() {
 		assert.NotEqual(s.T(), created.Id, uuid.Nil.String(), "expected not empty ID")
 		assert.Equal(s.T(), int64(1), created.Version, "expected version == 1")
 	}
-	getAll, err = entryService.GetAll(ctx, &pb.GetAllEntriesRequest{})
+	getAll, err = entryService.GetAll(ctx, &pb.GetEntriesRequest{})
 	require.NoError(s.T(), err, "no error expected")
 	require.NotNil(s.T(), getAll, "expected response not nil")
 	require.NotEmpty(s.T(), getAll.Entries, "expected not empty entries response")
@@ -218,7 +219,7 @@ func (s *AppSuite) TestApp() {
 	assert.Equal(s.T(), entries[0].Id, deleted.Id, "deleted entry id mismatch")
 	assert.Equal(s.T(), entries[0].Version, deleted.Version, "deleted entry version mismatch")
 	entries = entries[1:]
-	getAll, err = entryService.GetAll(ctx, &pb.GetAllEntriesRequest{})
+	getAll, err = entryService.GetAll(ctx, &pb.GetEntriesRequest{})
 	require.NoError(s.T(), err, "no error expected")
 	require.NotNil(s.T(), getAll, "expected response not nil")
 	require.NotEmpty(s.T(), getAll.Entries, "expected not empty entries response")
@@ -282,6 +283,27 @@ func (s *AppSuite) TestApp() {
 	assert.True(s.T(), reflect.DeepEqual(entries[0].Meta, get.Entry.Meta), "get entry meta mismatch")
 	assert.Equal(s.T(), entries[0].Data, get.Entry.Data, "get entry data mismatch")
 	assert.Equal(s.T(), conflict.Version, get.Entry.Version, "get entry version mismatch")
+
+	// 4 Get difference
+	getAll, err = entryService.GetAll(ctx, &pb.GetEntriesRequest{})
+	require.NoError(s.T(), err, "no error expected")
+	versions := make([]*pb.EntryVersion, len(getAll.Entries))
+	for i, v := range getAll.Entries {
+		versions[i] = &pb.EntryVersion{Id: v.Id, Version: v.Version}
+	}
+	versions[len(versions)-1] = &pb.EntryVersion{Id: uuid.New().String(), Version: 1} // server does not have this entry
+	versions[0].Version = versions[0].Version + 10
+	getDiff, err := entryService.GetDiff(ctx, &pb.GetEntriesDiffRequest{Versions: versions})
+	require.NoError(s.T(), err, "no error expected")
+	require.Len(s.T(), getDiff.Entries, 2, "expected non-empty list")
+	require.Len(s.T(), getDiff.CreateIds, 1, "expected non-empty list")
+	require.Len(s.T(), getDiff.UpdateIds, 1, "expected non-empty list")
+	require.Len(s.T(), getDiff.DeleteIds, 1, "expected non-empty list")
+	require.Equal(s.T(), getDiff.CreateIds[0], getAll.Entries[len(getAll.Entries)-1].Id, "expected same entry")
+	require.Equal(s.T(), getDiff.DeleteIds[0], versions[len(versions)-1].Id, "expected same entry")
+	require.Equal(s.T(), getDiff.UpdateIds[0], versions[0].Id, "expected same entry")
+	require.True(s.T(), slices.ContainsFunc(getDiff.Entries, func(entry *pb.Entry) bool { return entry.Id == getDiff.UpdateIds[0] }), "expected entry in list")
+	require.True(s.T(), slices.ContainsFunc(getDiff.Entries, func(entry *pb.Entry) bool { return entry.Id == getDiff.CreateIds[0] }), "expected entry in list")
 }
 
 func (s *AppSuite) createGRPCConn() *grpc.ClientConn {

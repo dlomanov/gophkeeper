@@ -30,17 +30,29 @@ message SignInUserResponse {
 
 service EntryService {
   rpc Get (GetEntryRequest) returns (GetEntryResponse);
-  rpc GetAll (GetAllEntriesRequest) returns (GetAllEntriesResponse);
+  rpc GetAll (GetEntriesRequest) returns (GetEntriesResponse);
+  rpc GetDiff (GetEntriesDiffRequest) returns (GetEntriesDiffResponse);
   rpc Create (CreateEntryRequest) returns (CreateEntryResponse);
   rpc Update (UpdateEntryRequest) returns (UpdateEntryResponse);
   rpc Delete (DeleteEntryRequest) returns (DeleteEntryResponse);
 }
 
-message GetAllEntriesRequest {
+message GetEntriesRequest {
 }
 
-message GetAllEntriesResponse {
+message GetEntriesResponse {
   repeated Entry entries = 1;
+}
+
+message GetEntriesDiffRequest {
+  repeated EntryVersion versions = 1;
+}
+
+message GetEntriesDiffResponse {
+  repeated Entry entries = 1;
+  repeated string createIds = 2;
+  repeated string updateIds = 3;
+  repeated string deleteIds = 4;
 }
 
 message GetEntryRequest {
@@ -92,6 +104,11 @@ message Entry {
   map<string, string> meta = 4;
   bytes data = 5;
   int64 version = 6;
+}
+
+message EntryVersion {
+  string id = 1;
+  int64 version = 2;
 }
 
 enum EntryType {

@@ -146,11 +146,12 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	EntryService_Get_FullMethodName    = "/proto.EntryService/Get"
-	EntryService_GetAll_FullMethodName = "/proto.EntryService/GetAll"
-	EntryService_Create_FullMethodName = "/proto.EntryService/Create"
-	EntryService_Update_FullMethodName = "/proto.EntryService/Update"
-	EntryService_Delete_FullMethodName = "/proto.EntryService/Delete"
+	EntryService_Get_FullMethodName     = "/proto.EntryService/Get"
+	EntryService_GetAll_FullMethodName  = "/proto.EntryService/GetAll"
+	EntryService_GetDiff_FullMethodName = "/proto.EntryService/GetDiff"
+	EntryService_Create_FullMethodName  = "/proto.EntryService/Create"
+	EntryService_Update_FullMethodName  = "/proto.EntryService/Update"
+	EntryService_Delete_FullMethodName  = "/proto.EntryService/Delete"
 )
 
 // EntryServiceClient is the client API for EntryService service.
@@ -158,7 +159,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EntryServiceClient interface {
 	Get(ctx context.Context, in *GetEntryRequest, opts ...grpc.CallOption) (*GetEntryResponse, error)
-	GetAll(ctx context.Context, in *GetAllEntriesRequest, opts ...grpc.CallOption) (*GetAllEntriesResponse, error)
+	GetAll(ctx context.Context, in *GetEntriesRequest, opts ...grpc.CallOption) (*GetEntriesResponse, error)
+	GetDiff(ctx context.Context, in *GetEntriesDiffRequest, opts ...grpc.CallOption) (*GetEntriesDiffResponse, error)
 	Create(ctx context.Context, in *CreateEntryRequest, opts ...grpc.CallOption) (*CreateEntryResponse, error)
 	Update(ctx context.Context, in *UpdateEntryRequest, opts ...grpc.CallOption) (*UpdateEntryResponse, error)
 	Delete(ctx context.Context, in *DeleteEntryRequest, opts ...grpc.CallOption) (*DeleteEntryResponse, error)
@@ -181,9 +183,18 @@ func (c *entryServiceClient) Get(ctx context.Context, in *GetEntryRequest, opts 
 	return out, nil
 }
 
-func (c *entryServiceClient) GetAll(ctx context.Context, in *GetAllEntriesRequest, opts ...grpc.CallOption) (*GetAllEntriesResponse, error) {
-	out := new(GetAllEntriesResponse)
+func (c *entryServiceClient) GetAll(ctx context.Context, in *GetEntriesRequest, opts ...grpc.CallOption) (*GetEntriesResponse, error) {
+	out := new(GetEntriesResponse)
 	err := c.cc.Invoke(ctx, EntryService_GetAll_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *entryServiceClient) GetDiff(ctx context.Context, in *GetEntriesDiffRequest, opts ...grpc.CallOption) (*GetEntriesDiffResponse, error) {
+	out := new(GetEntriesDiffResponse)
+	err := c.cc.Invoke(ctx, EntryService_GetDiff_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +233,8 @@ func (c *entryServiceClient) Delete(ctx context.Context, in *DeleteEntryRequest,
 // for forward compatibility
 type EntryServiceServer interface {
 	Get(context.Context, *GetEntryRequest) (*GetEntryResponse, error)
-	GetAll(context.Context, *GetAllEntriesRequest) (*GetAllEntriesResponse, error)
+	GetAll(context.Context, *GetEntriesRequest) (*GetEntriesResponse, error)
+	GetDiff(context.Context, *GetEntriesDiffRequest) (*GetEntriesDiffResponse, error)
 	Create(context.Context, *CreateEntryRequest) (*CreateEntryResponse, error)
 	Update(context.Context, *UpdateEntryRequest) (*UpdateEntryResponse, error)
 	Delete(context.Context, *DeleteEntryRequest) (*DeleteEntryResponse, error)
@@ -236,8 +248,11 @@ type UnimplementedEntryServiceServer struct {
 func (UnimplementedEntryServiceServer) Get(context.Context, *GetEntryRequest) (*GetEntryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
-func (UnimplementedEntryServiceServer) GetAll(context.Context, *GetAllEntriesRequest) (*GetAllEntriesResponse, error) {
+func (UnimplementedEntryServiceServer) GetAll(context.Context, *GetEntriesRequest) (*GetEntriesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAll not implemented")
+}
+func (UnimplementedEntryServiceServer) GetDiff(context.Context, *GetEntriesDiffRequest) (*GetEntriesDiffResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDiff not implemented")
 }
 func (UnimplementedEntryServiceServer) Create(context.Context, *CreateEntryRequest) (*CreateEntryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
@@ -280,7 +295,7 @@ func _EntryService_Get_Handler(srv interface{}, ctx context.Context, dec func(in
 }
 
 func _EntryService_GetAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetAllEntriesRequest)
+	in := new(GetEntriesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -292,7 +307,25 @@ func _EntryService_GetAll_Handler(srv interface{}, ctx context.Context, dec func
 		FullMethod: EntryService_GetAll_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EntryServiceServer).GetAll(ctx, req.(*GetAllEntriesRequest))
+		return srv.(EntryServiceServer).GetAll(ctx, req.(*GetEntriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EntryService_GetDiff_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEntriesDiffRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EntryServiceServer).GetDiff(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EntryService_GetDiff_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EntryServiceServer).GetDiff(ctx, req.(*GetEntriesDiffRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -365,6 +398,10 @@ var EntryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAll",
 			Handler:    _EntryService_GetAll_Handler,
+		},
+		{
+			MethodName: "GetDiff",
+			Handler:    _EntryService_GetDiff_Handler,
 		},
 		{
 			MethodName: "Create",

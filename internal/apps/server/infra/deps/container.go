@@ -7,6 +7,7 @@ import (
 	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/config"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/repo"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/diff"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/pass"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/token"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
@@ -50,6 +51,7 @@ func NewContainer(
 	// services
 	hasher := pass.NewHasher(config.PassHashCost)
 	tokener := token.NewJWT(config.TokenSecretKey, config.TokenExpires)
+	merger := diff.NewEntry()
 	encrypter, err := encrypto.NewEncrypter(config.DataSecretKey)
 	if err != nil {
 		return nil, fmt.Errorf("container: failed to create encrypter: %w", err)
@@ -60,6 +62,7 @@ func NewContainer(
 	entryUC := usecases.NewEntryUC(
 		logger,
 		repo.NewEntryRepo(db, getter),
+		merger,
 		encrypter,
 		trm)
 
