@@ -29,8 +29,9 @@ func Run(ctx context.Context, config *config.Config) error {
 		err    error
 	)
 	if logger, err = logging.NewLogger(logging.Config{
-		Level: config.LogLevel,
-		Type:  config.LogType,
+		Level:       config.LogLevel,
+		Type:        config.LogType,
+		OutputPaths: config.LogOutputPaths,
 	}); err != nil {
 		return err
 	}
@@ -40,6 +41,8 @@ func Run(ctx context.Context, config *config.Config) error {
 		return err
 	}
 	defer closeContainer(c)
+
+	c.Logger.Info("app started")
 
 	model := newModel(c)
 	if _, err := tea.NewProgram(model).Run(); err != nil {

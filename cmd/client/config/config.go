@@ -80,7 +80,7 @@ func (c *config) readFlags() {
 	flag.StringVar(&c.ConfigPath, "config", c.ConfigPath, "config path")
 	flag.StringVar(&c.LogLevel, "log_level", c.LogLevel, "log level")
 	flag.StringVar(&c.LogType, "log_type", c.LogType, "log type")
-	flag.StringVar(&c.LogOutputPaths, "log_output_paths", c.LogType, "log output paths")
+	flag.StringVar(&c.LogOutputPaths, "log_output_paths", c.LogOutputPaths, "log output paths")
 	flag.StringVar(&c.CertPath, "cert_path", c.CertPath, "cert path")
 
 	flag.Parse()
