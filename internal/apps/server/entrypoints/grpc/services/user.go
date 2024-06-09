@@ -34,7 +34,10 @@ func NewUserService(
 	}
 }
 
-func (s *UserService) SignUp(ctx context.Context, request *pb.SignUpUserRequest) (*pb.SignUpUserResponse, error) {
+func (s *UserService) SignUp(
+	ctx context.Context,
+	request *pb.SignUpUserRequest,
+) (*pb.SignUpUserResponse, error) {
 	creds := entities.Creds{
 		Login: entities.Login(request.Login),
 		Pass:  entities.Pass(request.Password),
@@ -46,6 +49,8 @@ func (s *UserService) SignUp(ctx context.Context, request *pb.SignUpUserRequest)
 	}
 	var invalid *apperrors.AppErrorInvalid
 	switch {
+	case errors.Is(err, entities.ErrUserExists):
+		return nil, status.Error(codes.AlreadyExists, err.Error())
 	case errors.As(err, &invalid):
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	case err != nil:

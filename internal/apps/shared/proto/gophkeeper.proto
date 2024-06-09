@@ -89,7 +89,6 @@ message UpdateEntryResponse {
 
 message DeleteEntryRequest {
   string id = 1;
-  int64 version = 2;
 }
 
 message DeleteEntryResponse {

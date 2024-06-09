@@ -88,7 +88,7 @@ func (c *config) readFlags() {
 	flag.DurationVar(&c.TokenExpires, "token_expires", c.TokenExpires, "token expires")
 	flag.StringVar(&c.LogLevel, "log_level", c.LogLevel, "log level")
 	flag.StringVar(&c.LogType, "log_type", c.LogType, "log type")
-	flag.StringVar(&c.DataSecretKey, "data_secret_key", c.DataSecretKey, "data secret key")
+	flag.StringVar(&c.DataSecretKey, "data_secret_key", c.DataSecretKey, "data secret key 16/24/32 bytes")
 	flag.StringVar(&c.CertPath, "cert_path", c.CertPath, "TLS-certificate file path")
 	flag.StringVar(&c.CertKeyPath, "cert_key_path", c.CertKeyPath, "TLS-certificate key file path")
 	flag.Parse()

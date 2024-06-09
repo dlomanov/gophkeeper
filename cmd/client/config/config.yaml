@@ -1,1 +1,5 @@
 address: ":9090"
+log_level: "debug"
+log_type: "development"
+log_output_paths: "logs.log"
+cert_path: ""

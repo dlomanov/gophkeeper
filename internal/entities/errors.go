@@ -5,6 +5,7 @@ import "github.com/dlomanov/gophkeeper/internal/core/apperrors"
 var (
 	ErrEntryKeyInvalid       = apperrors.NewInvalid("invalid entry key")
 	ErrEntryIsNil            = apperrors.NewInvalid("entry is nil")
+	ErrEntryInvalid          = apperrors.NewInvalid("invalid entry")
 	ErrEntryIDInvalid        = apperrors.NewInvalid("invalid entry ID")
 	ErrEntryTypeInvalid      = apperrors.NewInvalid("invalid entry type")
 	ErrEntryVersionConflict  = apperrors.NewConflict("entry version conflict")
@@ -19,4 +20,5 @@ var (
 	ErrUserCredsInvalid      = apperrors.NewInvalid("user credentials are invalid")
 	ErrUserTokenInvalid      = apperrors.NewInvalid("invalid token")
 	ErrUserTokenExpired      = apperrors.NewInvalid("token expired")
+	ErrUserTokenNotFound     = apperrors.NewNotFound("token not found")
 )
