@@ -2,8 +2,8 @@ package token
 
 import (
 	"fmt"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
-	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"time"

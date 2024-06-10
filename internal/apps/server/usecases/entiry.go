@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/avito-tech/go-transaction-manager/trm/v2"
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -23,7 +24,7 @@ type (
 		Get(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entities.Entry, error)
 		GetAll(ctx context.Context, userID uuid.UUID) ([]entities.Entry, error)
 		GetByIDs(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]entities.Entry, error)
-		GetVersions(ctx context.Context, userID uuid.UUID) ([]entities.EntryVersion, error)
+		GetVersions(ctx context.Context, userID uuid.UUID) ([]core.EntryVersion, error)
 		Create(ctx context.Context, entry *entities.Entry) error
 		Update(ctx context.Context, entry *entities.Entry) error
 		Delete(ctx context.Context, userID uuid.UUID, id uuid.UUID) error
@@ -31,8 +32,8 @@ type (
 	EntryDiffer interface {
 		GetDiff(
 			ctx context.Context,
-			serverVersions []entities.EntryVersion,
-			clientVersions []entities.EntryVersion,
+			serverVersions []core.EntryVersion,
+			clientVersions []core.EntryVersion,
 		) (
 			createIDs []uuid.UUID,
 			updateIDs []uuid.UUID,
@@ -50,7 +51,7 @@ type (
 	}
 	GetEntriesDiffRequest struct {
 		UserID   uuid.UUID
-		Versions []entities.EntryVersion
+		Versions []core.EntryVersion
 	}
 	GetEntriesDiffResponse struct {
 		Entries   []entities.Entry
@@ -70,7 +71,7 @@ type (
 	CreateEntryRequest struct {
 		Key    string
 		UserID uuid.UUID
-		Type   entities.EntryType
+		Type   core.EntryType
 		Meta   map[string]string
 		Data   []byte
 	}
@@ -302,7 +303,7 @@ func (uc *EntryUC) Update(
 		case err != nil:
 			return fmt.Errorf("update_entry: failed to get entry from storage: %w", err)
 		}
-		err = entry.UpdateVersion(
+		err = entry.Update(
 			version,
 			entities.UpdateEntryMeta(request.Meta),
 			entities.UpdateEntryData(encrypted))

@@ -5,8 +5,9 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 	"strings"
 	"sync/atomic"
@@ -226,7 +227,7 @@ func (c *UpdateCard) inputsValid() bool {
 	}
 
 	t := strings.ToLower(c.typeInput.Value())
-	entryType := entities.EntryType(t)
+	entryType := core.EntryType(t)
 	return entryType.Valid()
 }
 

@@ -1,8 +1,8 @@
 package pass
 
 import (
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
-	"github.com/dlomanov/gophkeeper/internal/entities"
 	"golang.org/x/crypto/bcrypt"
 )
 

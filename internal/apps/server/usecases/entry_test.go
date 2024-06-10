@@ -2,9 +2,10 @@ package usecases_test
 
 import (
 	"context"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/diff"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/dlomanov/gophkeeper/internal/infra/encrypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -39,11 +40,11 @@ func TestEntryUC(t *testing.T) {
 
 	// Create + GetEntries
 	entries := make([]*entities.Entry, 3)
-	entries[0], err = entities.NewEntry("key1", userID1, entities.EntryTypePassword, []byte("test_data_1"))
+	entries[0], err = entities.NewEntry("key1", userID1, core.EntryTypePassword, []byte("test_data_1"))
 	require.NoError(t, err, "no error expected")
-	entries[1], err = entities.NewEntry("key2", userID1, entities.EntryTypeBinary, []byte("test_data_2"))
+	entries[1], err = entities.NewEntry("key2", userID1, core.EntryTypeBinary, []byte("test_data_2"))
 	require.NoError(t, err, "no error expected")
-	entries[2], err = entities.NewEntry("key3", userID1, entities.EntryTypeNote, []byte("test_data_3"))
+	entries[2], err = entities.NewEntry("key3", userID1, core.EntryTypeNote, []byte("test_data_3"))
 	require.NoError(t, err, "no error expected")
 	for i, entry := range entries {
 		created, err := sut.Create(ctx, usecases.CreateEntryRequest{
@@ -63,7 +64,7 @@ func TestEntryUC(t *testing.T) {
 	_, err = sut.Create(ctx, usecases.CreateEntryRequest{
 		Key:    entries[0].Key,
 		UserID: userID1,
-		Type:   entities.EntryTypeNote,
+		Type:   core.EntryTypeNote,
 		Meta:   map[string]string{"description": "test_note_4"},
 		Data:   []byte("test_data_4"),
 	})
@@ -177,11 +178,11 @@ func TestEntryUC(t *testing.T) {
 	// GetEntriesDiff
 	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
-	versions := make([]entities.EntryVersion, len(getAll.Entries))
+	versions := make([]core.EntryVersion, len(getAll.Entries))
 	for i, v := range getAll.Entries {
-		versions[i] = entities.EntryVersion{ID: v.ID, Version: v.Version}
+		versions[i] = core.EntryVersion{ID: v.ID, Version: v.Version}
 	}
-	versions[len(versions)-1] = entities.EntryVersion{ID: uuid.New(), Version: 1} // server does not have this entry
+	versions[len(versions)-1] = core.EntryVersion{ID: uuid.New(), Version: 1} // server does not have this entry
 	versions[0].Version = versions[0].Version + 10
 	getDiff, err := sut.GetEntriesDiff(ctx, usecases.GetEntriesDiffRequest{UserID: userID1, Versions: versions})
 	require.NoError(t, err, "no error expected")

@@ -3,8 +3,9 @@ package usecases_test
 import (
 	"context"
 	"github.com/avito-tech/go-transaction-manager/trm/v2"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 	"sort"
 	"sync"
@@ -135,15 +136,15 @@ func (r *MockEntryRepo) GetByIDs(
 func (r *MockEntryRepo) GetVersions(
 	ctx context.Context,
 	userID uuid.UUID,
-) ([]entities.EntryVersion, error) {
+) ([]core.EntryVersion, error) {
 	entries, err := r.GetAll(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	versions := make([]entities.EntryVersion, len(entries))
+	versions := make([]core.EntryVersion, len(entries))
 	for i, v := range entries {
-		versions[i] = entities.EntryVersion{
+		versions[i] = core.EntryVersion{
 			ID:      v.ID,
 			Version: v.Version,
 		}

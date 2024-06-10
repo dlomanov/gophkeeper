@@ -3,9 +3,9 @@ package repo_test
 import (
 	"context"
 	trmsqlx "github.com/avito-tech/go-transaction-manager/drivers/sqlx/v2"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/repo"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
-	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/dlomanov/gophkeeper/internal/infra/pg/migrator"
 	"github.com/dlomanov/gophkeeper/internal/infra/pg/testcont"
 	_ "github.com/jackc/pgx/v5/stdlib"

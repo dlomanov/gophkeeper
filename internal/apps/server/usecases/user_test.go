@@ -3,10 +3,10 @@ package usecases_test
 import (
 	"context"
 	"errors"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/pass"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/token"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
-	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"

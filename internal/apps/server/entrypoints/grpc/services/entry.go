@@ -3,11 +3,12 @@ package services
 import (
 	"context"
 	"errors"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entrypoints/grpc/interceptor"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/dlomanov/gophkeeper/internal/core/apperrors"
-	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -280,40 +281,40 @@ func (s *EntryService) toAPIEntry(entry entities.Entry) *pb.Entry {
 	}
 }
 
-func (s *EntryService) toAPIType(typ entities.EntryType) pb.EntryType {
+func (s *EntryService) toAPIType(typ core.EntryType) pb.EntryType {
 	switch typ {
-	case entities.EntryTypePassword:
+	case core.EntryTypePassword:
 		return pb.EntryType_ENTRY_TYPE_PASSWORD
-	case entities.EntryTypeNote:
+	case core.EntryTypeNote:
 		return pb.EntryType_ENTRY_TYPE_NOTE
-	case entities.EntryTypeCard:
+	case core.EntryTypeCard:
 		return pb.EntryType_ENTRY_TYPE_CARD
-	case entities.EntryTypeBinary:
+	case core.EntryTypeBinary:
 		return pb.EntryType_ENTRY_TYPE_BINARY
 	default:
 		return pb.EntryType_ENTRY_TYPE_UNSPECIFIED
 	}
 }
 
-func (s *EntryService) toEntityType(typ pb.EntryType) entities.EntryType {
+func (s *EntryService) toEntityType(typ pb.EntryType) core.EntryType {
 	switch typ {
 	case pb.EntryType_ENTRY_TYPE_PASSWORD:
-		return entities.EntryTypePassword
+		return core.EntryTypePassword
 	case pb.EntryType_ENTRY_TYPE_NOTE:
-		return entities.EntryTypeNote
+		return core.EntryTypeNote
 	case pb.EntryType_ENTRY_TYPE_CARD:
-		return entities.EntryTypeCard
+		return core.EntryTypeCard
 	case pb.EntryType_ENTRY_TYPE_BINARY:
-		return entities.EntryTypeBinary
+		return core.EntryTypeBinary
 	default:
-		return entities.EntryTypeUnspecified
+		return core.EntryTypeUnspecified
 	}
 }
 
-func (s *EntryService) toEntityVersions(versions []*pb.EntryVersion) []entities.EntryVersion {
-	result := make([]entities.EntryVersion, 0, len(versions))
+func (s *EntryService) toEntityVersions(versions []*pb.EntryVersion) []core.EntryVersion {
+	result := make([]core.EntryVersion, 0, len(versions))
 	for _, v := range versions {
-		result = append(result, entities.EntryVersion{
+		result = append(result, core.EntryVersion{
 			ID:      s.parseUUID(v.Id),
 			Version: v.Version,
 		})

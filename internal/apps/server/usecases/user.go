@@ -3,7 +3,7 @@ package usecases
 import (
 	"context"
 	"fmt"
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )

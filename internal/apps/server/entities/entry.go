@@ -2,18 +2,11 @@ package entities
 
 import (
 	"fmt"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"go.uber.org/multierr"
 	"time"
 
 	"github.com/google/uuid"
-)
-
-const (
-	EntryTypeUnspecified EntryType = ""
-	EntryTypePassword    EntryType = "password"
-	EntryTypeNote        EntryType = "note"
-	EntryTypeCard        EntryType = "card"
-	EntryTypeBinary      EntryType = "binary"
 )
 
 const (
@@ -25,33 +18,20 @@ type (
 		ID        uuid.UUID
 		UserID    uuid.UUID
 		Key       string
-		Type      EntryType
+		Type      core.EntryType
 		Meta      map[string]string
 		Data      []byte
 		Version   int64
 		CreatedAt time.Time
 		UpdatedAt time.Time
 	}
-	EntryType    string
-	EntryVersion struct {
-		ID      uuid.UUID
-		Version int64
-	}
 	EntryUpdateOption func(e *Entry) error
 )
-
-func (t EntryType) Valid() bool {
-	switch t {
-	case EntryTypePassword, EntryTypeNote, EntryTypeCard, EntryTypeBinary:
-		return true
-	}
-	return false
-}
 
 func NewEntry(
 	key string,
 	userID uuid.UUID,
-	typ EntryType,
+	typ core.EntryType,
 	data []byte,
 ) (*Entry, error) {
 	var err error
@@ -88,19 +68,24 @@ func NewEntry(
 	}, nil
 }
 
-func (e *Entry) UpdateVersion(version int64, opts ...EntryUpdateOption) error {
+func (e *Entry) Update(version int64, opts ...EntryUpdateOption) error {
 	if version != e.Version {
 		return fmt.Errorf("entry: version conflict: %w: %d != %d", ErrEntryVersionConflict, version, e.Version)
 	}
-	if err := e.update(opts...); err != nil {
-		return err
+	if len(opts) == 0 {
+		return nil
 	}
+
+	var err error
+	for _, opt := range opts {
+		err = multierr.Append(err, opt(e))
+	}
+	if err != nil {
+		return fmt.Errorf("entry: failed to update: %w", err)
+	}
+	e.UpdatedAt = time.Now().UTC()
 	e.Version++
 	return nil
-}
-
-func (e *Entry) Update(opts ...EntryUpdateOption) error {
-	return e.update(opts...)
 }
 
 func UpdateEntryData(data []byte) EntryUpdateOption {
@@ -121,20 +106,4 @@ func UpdateEntryMeta(meta map[string]string) EntryUpdateOption {
 		e.Meta = meta
 		return nil
 	}
-}
-
-func (e *Entry) update(opts ...EntryUpdateOption) error {
-	if len(opts) == 0 {
-		return nil
-	}
-
-	var err error
-	for _, opt := range opts {
-		err = multierr.Append(err, opt(e))
-	}
-	if err != nil {
-		return fmt.Errorf("entry: failed to update: %w", err)
-	}
-	e.UpdatedAt = time.Now().UTC()
-	return nil
 }

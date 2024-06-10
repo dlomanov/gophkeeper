@@ -3,7 +3,7 @@ package diff
 import (
 	"context"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 )
 
@@ -18,16 +18,16 @@ func NewEntry() *Entry {
 
 func (e Entry) GetDiff(
 	_ context.Context,
-	server []entities.EntryVersion,
-	clientVersions []entities.EntryVersion,
+	server []core.EntryVersion,
+	clientVersions []core.EntryVersion,
 ) (
 	createIDs []uuid.UUID,
 	updateIDs []uuid.UUID,
 	deleteIDs []uuid.UUID,
 	err error) {
 	var (
-		serverMap = make(map[uuid.UUID]entities.EntryVersion)
-		clientMap = make(map[uuid.UUID]entities.EntryVersion)
+		serverMap = make(map[uuid.UUID]core.EntryVersion)
+		clientMap = make(map[uuid.UUID]core.EntryVersion)
 	)
 	for _, v := range server {
 		serverMap[v.ID] = v

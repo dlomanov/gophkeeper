@@ -1,7 +1,8 @@
 package entities_test
 
 import (
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +17,7 @@ func TestNewEntry(t *testing.T) {
 		testName string
 		key      string
 		userID   uuid.UUID
-		typ      entities.EntryType
+		typ      core.EntryType
 		data     []byte
 		meta     map[string]string
 		wantErrs []error
@@ -64,7 +65,7 @@ func TestNewEntry(t *testing.T) {
 			testName: "all invalid but key, userID, typ",
 			key:      "key",
 			userID:   uuid.New(),
-			typ:      entities.EntryTypeBinary,
+			typ:      core.EntryTypeBinary,
 			data:     nil,
 			meta:     nil,
 			wantErrs: []error{
@@ -75,7 +76,7 @@ func TestNewEntry(t *testing.T) {
 			testName: "almost valid but data size exceeded",
 			key:      "key",
 			userID:   uuid.New(),
-			typ:      entities.EntryTypeBinary,
+			typ:      core.EntryTypeBinary,
 			data:     []byte(strings.Repeat("s", entities.EntryMaxDataSize+1)),
 			meta:     nil,
 			wantErrs: []error{entities.ErrEntryDataSizeExceeded},
@@ -84,7 +85,7 @@ func TestNewEntry(t *testing.T) {
 			testName: "valid without metadata",
 			key:      "key",
 			userID:   uuid.New(),
-			typ:      entities.EntryTypeBinary,
+			typ:      core.EntryTypeBinary,
 			data:     []byte("data"),
 			meta:     nil,
 			wantErrs: nil,
@@ -93,7 +94,7 @@ func TestNewEntry(t *testing.T) {
 			testName: "valid without metadata",
 			key:      "key",
 			userID:   uuid.New(),
-			typ:      entities.EntryTypeBinary,
+			typ:      core.EntryTypeBinary,
 			data:     []byte("data"),
 			meta:     map[string]string{"key": "value"},
 			wantErrs: nil,
@@ -158,14 +159,14 @@ func TestUpdateVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			now := time.Now().UTC()
-			typ := entities.EntryTypeBinary
+			typ := core.EntryTypeBinary
 			entry := entities.Entry{
 				Version:   1,
 				Type:      typ,
 				UpdatedAt: now,
 			}
 			srcVersion := entry.Version
-			errs := entry.UpdateVersion(
+			errs := entry.Update(
 				entry.Version,
 				entities.UpdateEntryData(tt.data),
 				entities.UpdateEntryMeta(tt.meta))
@@ -187,17 +188,17 @@ func TestUpdateVersion(t *testing.T) {
 }
 
 func TestUpdateVersion_nonOptions(t *testing.T) {
-	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
+	entry, err := entities.NewEntry("key", uuid.New(), core.EntryTypePassword, []byte("test"))
 	require.NoError(t, err, "failed to create entry")
-	err = entry.UpdateVersion(entry.Version)
+	err = entry.Update(entry.Version)
 	require.NoError(t, err)
 	assert.Equal(t, entry.CreatedAt, entry.UpdatedAt, "created at should be equal to updated at")
 }
 
 func TestUpdateVersion_invalidOptions(t *testing.T) {
-	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
+	entry, err := entities.NewEntry("key", uuid.New(), core.EntryTypePassword, []byte("test"))
 	require.NoError(t, err, "failed to create entry")
-	errs := entry.UpdateVersion(entry.Version,
+	errs := entry.Update(entry.Version,
 		entities.UpdateEntryData(nil),
 		entities.UpdateEntryData([]byte(strings.Repeat("s", entities.EntryMaxDataSize+1))),
 	)
@@ -206,8 +207,8 @@ func TestUpdateVersion_invalidOptions(t *testing.T) {
 }
 
 func TestUpdateVersion_versionConflict(t *testing.T) {
-	entry, err := entities.NewEntry("key", uuid.New(), entities.EntryTypePassword, []byte("test"))
+	entry, err := entities.NewEntry("key", uuid.New(), core.EntryTypePassword, []byte("test"))
 	require.NoError(t, err, "failed to create entry")
-	errs := entry.UpdateVersion(entry.Version-1, entities.UpdateEntryData([]byte("test1")))
+	errs := entry.Update(entry.Version-1, entities.UpdateEntryData([]byte("test1")))
 	require.ErrorIs(t, errs, entities.ErrEntryVersionConflict, "want version conflict error")
 }

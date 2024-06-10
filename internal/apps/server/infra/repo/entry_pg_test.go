@@ -3,9 +3,10 @@ package repo_test
 import (
 	"context"
 	trmsqlx "github.com/avito-tech/go-transaction-manager/drivers/sqlx/v2"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/repo"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/dlomanov/gophkeeper/internal/infra/pg/migrator"
 	"github.com/dlomanov/gophkeeper/internal/infra/pg/testcont"
 	"github.com/google/uuid"
@@ -85,12 +86,12 @@ func (s *EntryTestSuit) TestEntryRepo() {
 	require.Empty(s.T(), getAll, "expected empty entries")
 
 	entries := make([]*entities.Entry, 3)
-	entries[0], err = entities.NewEntry("key1", user.ID, entities.EntryTypePassword, []byte("test_data_1"))
+	entries[0], err = entities.NewEntry("key1", user.ID, core.EntryTypePassword, []byte("test_data_1"))
 	entries[0].Meta = map[string]string{"key1": "value1", "key2": "value2"}
 	require.NoError(s.T(), err, "no error expected when creating entry")
-	entries[1], err = entities.NewEntry("key2", user.ID, entities.EntryTypeBinary, []byte("test_data_2"))
+	entries[1], err = entities.NewEntry("key2", user.ID, core.EntryTypeBinary, []byte("test_data_2"))
 	require.NoError(s.T(), err, "no error expected when creating entry")
-	entries[2], err = entities.NewEntry("key3", user.ID, entities.EntryTypeNote, []byte("test_data_3"))
+	entries[2], err = entities.NewEntry("key3", user.ID, core.EntryTypeNote, []byte("test_data_3"))
 	require.NoError(s.T(), err, "no error expected when creating entry")
 	for _, entry := range entries {
 		err = entryRepo.Create(ctx, entry)

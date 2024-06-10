@@ -3,9 +3,10 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
 	sharedmd "github.com/dlomanov/gophkeeper/internal/apps/shared/md"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
@@ -25,7 +26,7 @@ type (
 	}
 	CreateEntryRequest struct {
 		Key  string
-		Type entities.EntryType
+		Type core.EntryType
 		Meta map[string]string
 		Data []byte
 	}
@@ -177,34 +178,34 @@ func (uc *EntryUC) toEntity(entry *pb.Entry) entities.Entry {
 	}
 }
 
-func (uc *EntryUC) toEntityType(t pb.EntryType) entities.EntryType {
+func (uc *EntryUC) toEntityType(t pb.EntryType) core.EntryType {
 	switch t {
 	case pb.EntryType_ENTRY_TYPE_UNSPECIFIED:
-		return entities.EntryTypeUnspecified
+		return core.EntryTypeUnspecified
 	case pb.EntryType_ENTRY_TYPE_PASSWORD:
-		return entities.EntryTypePassword
+		return core.EntryTypePassword
 	case pb.EntryType_ENTRY_TYPE_NOTE:
-		return entities.EntryTypeNote
+		return core.EntryTypeNote
 	case pb.EntryType_ENTRY_TYPE_CARD:
-		return entities.EntryTypeCard
+		return core.EntryTypeCard
 	case pb.EntryType_ENTRY_TYPE_BINARY:
-		return entities.EntryTypeBinary
+		return core.EntryTypeBinary
 	default:
-		return entities.EntryTypeUnspecified
+		return core.EntryTypeUnspecified
 	}
 }
 
-func (uc *EntryUC) toAPIType(t entities.EntryType) pb.EntryType {
+func (uc *EntryUC) toAPIType(t core.EntryType) pb.EntryType {
 	switch t {
-	case entities.EntryTypeUnspecified:
+	case core.EntryTypeUnspecified:
 		return pb.EntryType_ENTRY_TYPE_UNSPECIFIED
-	case entities.EntryTypePassword:
+	case core.EntryTypePassword:
 		return pb.EntryType_ENTRY_TYPE_PASSWORD
-	case entities.EntryTypeNote:
+	case core.EntryTypeNote:
 		return pb.EntryType_ENTRY_TYPE_NOTE
-	case entities.EntryTypeCard:
+	case core.EntryTypeCard:
 		return pb.EntryType_ENTRY_TYPE_CARD
-	case entities.EntryTypeBinary:
+	case core.EntryTypeBinary:
 		return pb.EntryType_ENTRY_TYPE_BINARY
 	default:
 		return pb.EntryType_ENTRY_TYPE_UNSPECIFIED

@@ -38,7 +38,8 @@ func NewLogger(config Config) (*zap.Logger, error) {
 
 	c.Level = lvl
 	if len(config.OutputPaths) != 0 {
-		c.OutputPaths = append(config.OutputPaths, "stderr")
+		c.OutputPaths = config.OutputPaths
+		c.ErrorOutputPaths = config.OutputPaths
 	}
 	return c.Build()
 }

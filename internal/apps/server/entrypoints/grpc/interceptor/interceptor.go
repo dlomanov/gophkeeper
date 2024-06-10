@@ -3,8 +3,8 @@ package interceptor
 import (
 	"context"
 	"fmt"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	sharedmd "github.com/dlomanov/gophkeeper/internal/apps/shared/md"
-	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"

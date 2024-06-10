@@ -3,10 +3,10 @@ package services
 import (
 	"context"
 	"errors"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
 	"github.com/dlomanov/gophkeeper/internal/core/apperrors"
-	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"

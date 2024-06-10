@@ -1,7 +1,7 @@
 package entities_test
 
 import (
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"testing"
 
 	"github.com/stretchr/testify/require"

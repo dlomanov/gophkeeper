@@ -7,7 +7,8 @@ import (
 	"errors"
 	"fmt"
 	trmsqlx "github.com/avito-tech/go-transaction-manager/drivers/sqlx/v2"
-	"github.com/dlomanov/gophkeeper/internal/entities"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -77,7 +78,7 @@ func (r *EntryRepo) GetAll(ctx context.Context, userID uuid.UUID) ([]entities.En
 	return r.toEntities(rows)
 }
 
-func (r *EntryRepo) GetVersions(ctx context.Context, userID uuid.UUID) ([]entities.EntryVersion, error) {
+func (r *EntryRepo) GetVersions(ctx context.Context, userID uuid.UUID) ([]core.EntryVersion, error) {
 	var rows []entryVersionRow
 	err := r.getDB(ctx).SelectContext(ctx, &rows, `
 		SELECT id, version FROM entries WHERE user_id = $1;`, userID)
@@ -236,7 +237,7 @@ func (*EntryRepo) toEntity(row entryRow) (*entities.Entry, error) {
 		UpdatedAt: row.UpdatedAt,
 	}
 
-	typ := entities.EntryType(row.Type)
+	typ := core.EntryType(row.Type)
 	if !typ.Valid() {
 		return nil, fmt.Errorf("entry_repo: invalid entry type: %s", row.Type)
 	}
@@ -253,10 +254,10 @@ func (*EntryRepo) toEntity(row entryRow) (*entities.Entry, error) {
 	return entry, nil
 }
 
-func (r *EntryRepo) toEntryVersions(rows []entryVersionRow) ([]entities.EntryVersion, error) {
-	versions := make([]entities.EntryVersion, 0, len(rows))
+func (r *EntryRepo) toEntryVersions(rows []entryVersionRow) ([]core.EntryVersion, error) {
+	versions := make([]core.EntryVersion, 0, len(rows))
 	for _, row := range rows {
-		versions = append(versions, entities.EntryVersion{
+		versions = append(versions, core.EntryVersion{
 			ID:      row.ID,
 			Version: row.Version,
 		})

@@ -3,8 +3,8 @@ package usecases
 import (
 	"context"
 	"fmt"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
-	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
