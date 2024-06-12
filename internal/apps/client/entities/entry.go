@@ -25,6 +25,10 @@ type (
 		CreatedAt     time.Time
 		UpdatedAt     time.Time
 	}
+	EntrySync struct {
+		ID        uuid.UUID
+		CreatedAt time.Time
+	}
 	EntryUpdateOption func(e *Entry) error
 )
 
@@ -98,5 +102,12 @@ func UpdateEntryMeta(meta map[string]string) EntryUpdateOption {
 	return func(e *Entry) error {
 		e.Meta = meta
 		return nil
+	}
+}
+
+func NewEntrySync(id uuid.UUID) *EntrySync {
+	return &EntrySync{
+		ID:        id,
+		CreatedAt: time.Now().UTC(),
 	}
 }

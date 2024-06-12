@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/infra/services/mem"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
-	"github.com/patrickmn/go-cache"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,7 +14,7 @@ import (
 type (
 	UserUC struct {
 		logger     *zap.Logger
-		cache      *cache.Cache
+		cache      *mem.Cache
 		userClient pb.UserServiceClient
 	}
 	SignUpUserRequest struct {
@@ -29,7 +29,7 @@ type (
 
 func NewUserUC(
 	logger *zap.Logger,
-	cache *cache.Cache,
+	cache *mem.Cache,
 	userClient pb.UserServiceClient,
 ) *UserUC {
 	return &UserUC{
@@ -55,8 +55,8 @@ func (uc *UserUC) SignUp(
 	case err != nil:
 		return fmt.Errorf("user_sign_up: internal server error: %w", err)
 	}
-	uc.cache.Set("login", request.Login, cache.NoExpiration)
-	uc.cache.Set("token", resp.Token, cache.NoExpiration)
+	uc.cache.SetString("login", request.Login)
+	uc.cache.SetString("token", resp.Token)
 	return nil
 }
 
@@ -76,7 +76,7 @@ func (uc *UserUC) SignIn(
 	case err != nil:
 		return fmt.Errorf("user_sign_up: internal server error: %w", err)
 	}
-	uc.cache.Set("login", request.Login, cache.NoExpiration)
-	uc.cache.Set("token", resp.Token, cache.NoExpiration)
+	uc.cache.SetString("login", request.Login)
+	uc.cache.SetString("token", resp.Token)
 	return nil
 }

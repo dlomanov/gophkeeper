@@ -61,14 +61,36 @@ func TestEntryUC(t *testing.T) {
 		entries[i].Version = created.Version
 		time.Sleep(time.Millisecond) // for sorting purposes
 	}
-	_, err = sut.Create(ctx, usecases.CreateEntryRequest{
+	created, err := sut.Create(ctx, usecases.CreateEntryRequest{
 		Key:    entries[0].Key,
 		UserID: userID1,
 		Type:   core.EntryTypeNote,
 		Meta:   map[string]string{"description": "test_note_4"},
 		Data:   []byte("test_data_4"),
 	})
-	require.ErrorIs(t, err, entities.ErrEntryExists, "expected entry exists error")
+	require.NoError(t, err, "no error expected")
+	require.NotEqual(t, entries[0].ID, created.ID, "expected different IDs")
+	got, err := sut.Get(ctx, usecases.GetEntryRequest{
+		ID:     created.ID,
+		UserID: userID1,
+	})
+	require.NoError(t, err, "no error expected")
+	require.NotNil(t, got.Entry, "expected non-nil entry")
+	require.Equal(t, created.ID, got.Entry.ID, "expected same IDs")
+	require.True(t, strings.HasPrefix(got.Entry.Key, entries[0].Key), "expected key prefix")
+	require.Equal(t, got.Entry.UserID, entries[0].UserID, "expected same user IDs")
+	require.NotEqual(t, got.Entry.Type, entries[0].Type, "expected different entry types")
+	require.False(t, reflect.DeepEqual(got.Entry.Meta, entries[0].Meta), "expected different entry meta")
+	require.NotEqual(t, got.Entry.Data, entries[0].Data, "expected different entry data")
+	require.Equal(t, got.Entry.Version, entries[0].Version, "expected same entry versions")
+	require.NotEmpty(t, got.Entry.CreatedAt, "expected non-empty created at")
+	require.NotEmpty(t, got.Entry.UpdatedAt, "expected non-empty created at")
+	_, err = sut.Delete(ctx, usecases.DeleteEntryRequest{
+		ID:     created.ID,
+		UserID: userID1,
+	})
+	require.NoError(t, err, "no error expected")
+
 	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	require.NotEmpty(t, getAll.Entries, "expected non-empty list")

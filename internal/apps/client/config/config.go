@@ -3,11 +3,12 @@ package config
 import "errors"
 
 type Config struct {
-	Address        string // GRPC-server address
-	LogLevel       string
-	LogType        string
-	LogOutputPaths []string
-	Cert           []byte
+	Address        string   // GRPC-server address
+	LogLevel       string   // log level
+	LogType        string   // logger type
+	LogOutputPaths []string // logger output paths
+	Cert           []byte   // TLS certificate
+	DSN            string   // database DSN
 }
 
 func (c Config) Validate() error {
@@ -23,6 +24,9 @@ func (c Config) Validate() error {
 	}
 	if len(c.Cert) == 0 {
 		errs = append(errs, errors.New("TLS certificate should be specified"))
+	}
+	if c.DSN == "" {
+		errs = append(errs, errors.New("database DSN should be specified"))
 	}
 	return errors.Join(errs...)
 }

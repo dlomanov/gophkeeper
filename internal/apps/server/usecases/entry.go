@@ -262,12 +262,30 @@ func (uc *EntryUC) Create(
 		return resp, fmt.Errorf("create_entry: failed to create_entry: %w", err)
 	}
 	entry.Meta = request.Meta
-	err = uc.entryRepo.Create(ctx, entry)
-	switch {
-	case errors.Is(err, entities.ErrEntryExists):
-		return resp, fmt.Errorf("create_entry: entry already exists: %w", err)
-	case err != nil:
-		return resp, fmt.Errorf("create_entry: failed to insert entry to storage: %w", err)
+	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
+		err = uc.entryRepo.Create(ctx, entry)
+		switch {
+		case errors.Is(err, entities.ErrEntryExists):
+			conflictKey := uc.newConflictKey(entry.Key, entry.Version)
+			conflictEntry, err := entities.NewEntry(conflictKey, entry.UserID, entry.Type, encrypted)
+			if err != nil {
+				return fmt.Errorf("create_entry: failed to create conflict entry: %w: %w", err, entities.ErrEntryExists)
+			}
+			conflictEntry.Meta = request.Meta
+			if err = uc.entryRepo.Create(ctx, conflictEntry); err != nil {
+				return fmt.Errorf("create_entry: failed to create conflict entry in repo: %w: %w", err, entities.ErrEntryExists)
+			}
+			entry = conflictEntry
+		case err != nil:
+			return fmt.Errorf("create_entry: failed to create entry in repo: %w", err)
+		}
+		return nil
+	}); err != nil {
+		uc.logger.Error("failed to create entry",
+			zap.String("user_id", userID.String()),
+			zap.String("key", request.Key),
+			zap.Error(err))
+		return resp, err
 	}
 	resp.ID = entry.ID
 	resp.Version = entry.Version
@@ -310,7 +328,7 @@ func (uc *EntryUC) Update(
 		switch {
 		// handle version conflict by saving conflict version of entry
 		case errors.Is(err, entities.ErrEntryVersionConflict):
-			conflictKey := fmt.Sprintf("%s_conflict_%d_%s", entry.Key, request.Version, uuid.New().String())
+			conflictKey := uc.newConflictKey(entry.Key, request.Version)
 			conflictEntry, err := entities.NewEntry(conflictKey, entry.UserID, entry.Type, encrypted)
 			if err != nil {
 				return fmt.Errorf("update_entry: failed to create conflict entry: %w", err)
@@ -382,6 +400,10 @@ func (uc *EntryUC) Delete(
 	resp.Version = entry.Version
 
 	return resp, nil
+}
+
+func (uc *EntryUC) newConflictKey(key string, version int64) string {
+	return fmt.Sprintf("%s_conflict_%d_%s", key, version, uuid.New().String())
 }
 
 func (r GetEntryRequest) validate() error {

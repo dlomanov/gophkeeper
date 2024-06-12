@@ -6,8 +6,8 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/repo"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
-	"github.com/dlomanov/gophkeeper/internal/infra/pg/migrator"
-	"github.com/dlomanov/gophkeeper/internal/infra/pg/testcont"
+	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
+	testcont2 "github.com/dlomanov/gophkeeper/internal/infra/testcont"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
@@ -33,8 +33,8 @@ func (s *UserTestSuit) SetupSuite() {
 	s.logger = zaptest.NewLogger(s.T(), zaptest.Level(zap.DebugLevel))
 	s.teardownCtx, s.teardown = context.WithCancel(context.Background())
 
-	dsn := testcont.PostgresDSN
-	s.pgc, dsn, err = testcont.RunPostgres(s.teardownCtx, dsn)
+	dsn := testcont2.PostgresDSN
+	s.pgc, dsn, err = testcont2.RunPostgres(s.teardownCtx, dsn)
 	require.NoError(s.T(), err, "no error expected")
 	s.db, err = sqlx.ConnectContext(s.teardownCtx, "pgx", dsn)
 	require.NoError(s.T(), err)
@@ -52,7 +52,7 @@ func (s *UserTestSuit) TearDownSuite() {
 		s.logger.Error("failed to close postgres db", zap.Error(err))
 	}
 
-	timeout, cancel := context.WithTimeout(context.Background(), testcont.TeardownTimeout)
+	timeout, cancel := context.WithTimeout(context.Background(), testcont2.TeardownTimeout)
 	defer cancel()
 	if err := s.pgc.Terminate(timeout); err != nil {
 		s.logger.Error("failed to terminate postgres container", zap.Error(err))

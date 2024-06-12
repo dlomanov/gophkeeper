@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	c := config.Parse(true)
+	c := config.Parse(false)
 	if err := client.Run(context.Background(), &c); err != nil {
 		log.Fatal(err)
 	}

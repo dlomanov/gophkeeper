@@ -6,15 +6,18 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/config"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/infra/deps"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/migrations"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components"
 	"github.com/dlomanov/gophkeeper/internal/infra/logging"
+	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
 	"go.uber.org/zap"
 )
 
 type Model struct {
 	tea.Model
-	layout   *ui.Layout
-	curr     ui.Component
+	layout   *components.Layout
+	curr     components.Component
 	quitting bool
 	status   string
 }
@@ -41,13 +44,15 @@ func Run(ctx context.Context, config *config.Config) error {
 		return err
 	}
 	defer closeContainer(c)
-
-	c.Logger.Info("app started")
-
-	model := newModel(c)
-	if _, err := tea.NewProgram(model).Run(); err != nil {
-		logger.Error("program stopped with error", zap.Error(err))
+	if err = upMigrations(c); err != nil {
+		return err
 	}
+	if err = c.Memcache.Load(ctx); err != nil {
+		logger.Error("failed to load memcache", zap.Error(err))
+		return err
+	}
+
+	runApp(c) // blocks current goroutine until termination
 
 	return nil
 }
@@ -58,61 +63,25 @@ func closeContainer(c *deps.Container) {
 	}
 }
 
-func newModel(c *deps.Container) Model {
-	main := ui.NewMain("gophkeeper", nil)
-	table := ui.NewTable("gophkeeper/entries", nil, c.EntryUC)
-	settings := ui.NewSettings("gophkeeper/settings", nil)
-	signUp := ui.NewSignUp("gophkeeper/sync/sign-up", nil, c.UserUC, c.Cache)
-	signIn := ui.NewSignIn("gophkeeper/sync/sign-in", nil, c.UserUC, c.Cache)
-	menu := ui.NewMenu("gophkeeper", main, []ui.Nav{
-		{Name: "Sign-up", Next: signUp},
-		{Name: "Sign-in", Next: signIn},
-		{Name: "Entries", Next: table},
-		{Name: "Settings", Next: settings},
-	})
-	table.SetPrev(menu)
-	settings.SetPrev(menu)
-	signUp.SetPrev(menu)
-	signIn.SetPrev(menu)
-	main.SetNext(menu)
-	return Model{
-		layout: ui.NewLayout(),
-		curr:   main,
+func upMigrations(c *deps.Container) error {
+	ms, err := migrations.GetMigrations()
+	if err != nil {
+		c.Logger.Error("failed to get migrations", zap.Error(err))
+		return err
 	}
+	if err = migrator.Migrate(c.Logger.Sugar(), c.DB.DB, ms); err != nil {
+		c.Logger.Error("failed to up migrations", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
-func (m Model) Init() tea.Cmd {
-	// TODO: possible spot for start background
-	return m.curr.Init()
-}
-
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
-		if k := msg.String(); k == "ctrl+c" {
-			m.quitting = true
-			return m, tea.Quit
-		}
+func runApp(c *deps.Container) {
+	c.Logger.Debug("starting app")
+	model := ui.NewModel(c)
+	if _, err := tea.NewProgram(model).Run(); err != nil {
+		c.Logger.Error("app stopped with error", zap.Error(err))
+		return
 	}
-	res, cmd := m.curr.Update(msg)
-	switch {
-	case res.Next != nil:
-		m.curr = res.Next
-		cmd = m.curr.Init()
-	case res.Prev != nil:
-		m.curr = res.Prev
-		cmd = m.curr.Init()
-	case res.Jump != nil:
-		m.curr = res.Jump
-		cmd = m.curr.Init()
-	}
-	if res.Status != "" {
-		m.status = res.Status
-	}
-	m.quitting = res.Quitting
-
-	return m, cmd
-}
-
-func (m Model) View() string {
-	return m.layout.View(m.curr, m.quitting, m.status)
+	c.Logger.Debug("app stopped")
 }

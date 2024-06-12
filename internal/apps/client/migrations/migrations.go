@@ -8,7 +8,7 @@ import (
 //go:embed *
 var fs embed.FS
 var files = []file{
-	{Name: "m0001.sql", Title: "M0001: Users table", NoTx: false},
+	{Name: "m0001.sql", Title: "M0001: User-preferences table", NoTx: false},
 	{Name: "m0002.sql", Title: "M0002: Entries table", NoTx: false},
 }
 

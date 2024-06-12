@@ -26,3 +26,6 @@ go.work
 
 # Logs
 *.log
+
+# Sqlite database
+*.db

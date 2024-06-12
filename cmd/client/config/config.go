@@ -15,11 +15,12 @@ import (
 
 type config struct {
 	Address        string `yaml:"address" env:"ADDRESS"`
-	ConfigPath     string `yaml:"config,omitempty" env:"CONFIG"`
+	ConfigPath     string `yaml:"config_path,omitempty" env:"CONFIG"`
 	LogLevel       string `yaml:"log_level" env:"LOG_LEVEL"`
 	LogType        string `yaml:"log_type" env:"LOG_TYPE"`
 	LogOutputPaths string `yaml:"log_output_paths" env:"LOG_OUTPUT_PATHS"`
 	CertPath       string `yaml:"cert_path" env:"CERT_PATH"`
+	DSN            string `yaml:"dsn" env:"DSN"`
 }
 
 //go:embed config.yaml
@@ -44,6 +45,16 @@ func (c *config) readDefaults() {
 	}
 	if err := yaml.Unmarshal(content, c); err != nil {
 		panic(err)
+	}
+	if c.ConfigPath != "" {
+		content, err = os.ReadFile(c.ConfigPath)
+		c.ConfigPath = ""
+		if err != nil {
+			return
+		}
+		if err := yaml.Unmarshal(content, c); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -82,7 +93,7 @@ func (c *config) readFlags() {
 	flag.StringVar(&c.LogType, "log_type", c.LogType, "log type")
 	flag.StringVar(&c.LogOutputPaths, "log_output_paths", c.LogOutputPaths, "log output paths")
 	flag.StringVar(&c.CertPath, "cert_path", c.CertPath, "cert path")
-
+	flag.StringVar(&c.DSN, "dsn", c.DSN, "database DSN")
 	flag.Parse()
 }
 
@@ -110,6 +121,7 @@ func (c *config) toConfig() clientcfg.Config {
 		LogType:        c.LogType,
 		LogOutputPaths: c.parseLogOutputPaths(),
 		Cert:           cert,
+		DSN:            c.DSN,
 	}
 }
 

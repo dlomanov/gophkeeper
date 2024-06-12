@@ -6,6 +6,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entrypoints/grpc/interceptor"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
+	"github.com/dlomanov/gophkeeper/internal/apps/shared/mapper"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
 	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/dlomanov/gophkeeper/internal/core/apperrors"
@@ -21,6 +22,7 @@ type EntryService struct {
 	pb.UnimplementedEntryServiceServer
 	logger  *zap.Logger
 	entryUC *usecases.EntryUC
+	mapper  mapper.EntryMapper
 }
 
 func NewEntryService(
@@ -30,6 +32,7 @@ func NewEntryService(
 	return &EntryService{
 		logger:  logger,
 		entryUC: entryUC,
+		mapper:  mapper.EntryMapper{},
 	}
 }
 
@@ -115,12 +118,7 @@ func (s *EntryService) GetDiff(
 		UserID:   userID,
 		Versions: versions,
 	})
-	var (
-		invalid *apperrors.AppErrorInvalid
-	)
 	switch {
-	case errors.As(err, &invalid):
-		return nil, status.Error(codes.InvalidArgument, err.Error())
 	case err != nil:
 		s.logger.Error("failed to get entries diff",
 			zap.String("user_id", userID.String()),
@@ -282,33 +280,11 @@ func (s *EntryService) toAPIEntry(entry entities.Entry) *pb.Entry {
 }
 
 func (s *EntryService) toAPIType(typ core.EntryType) pb.EntryType {
-	switch typ {
-	case core.EntryTypePassword:
-		return pb.EntryType_ENTRY_TYPE_PASSWORD
-	case core.EntryTypeNote:
-		return pb.EntryType_ENTRY_TYPE_NOTE
-	case core.EntryTypeCard:
-		return pb.EntryType_ENTRY_TYPE_CARD
-	case core.EntryTypeBinary:
-		return pb.EntryType_ENTRY_TYPE_BINARY
-	default:
-		return pb.EntryType_ENTRY_TYPE_UNSPECIFIED
-	}
+	return s.mapper.ToAPIType(typ)
 }
 
-func (s *EntryService) toEntityType(typ pb.EntryType) core.EntryType {
-	switch typ {
-	case pb.EntryType_ENTRY_TYPE_PASSWORD:
-		return core.EntryTypePassword
-	case pb.EntryType_ENTRY_TYPE_NOTE:
-		return core.EntryTypeNote
-	case pb.EntryType_ENTRY_TYPE_CARD:
-		return core.EntryTypeCard
-	case pb.EntryType_ENTRY_TYPE_BINARY:
-		return core.EntryTypeBinary
-	default:
-		return core.EntryTypeUnspecified
-	}
+func (s *EntryService) toEntityType(t pb.EntryType) core.EntryType {
+	return s.mapper.ToEntityType(t)
 }
 
 func (s *EntryService) toEntityVersions(versions []*pb.EntryVersion) []core.EntryVersion {

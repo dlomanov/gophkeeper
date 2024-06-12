@@ -7,8 +7,8 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/repo"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
 	"github.com/dlomanov/gophkeeper/internal/core"
-	"github.com/dlomanov/gophkeeper/internal/infra/pg/migrator"
-	"github.com/dlomanov/gophkeeper/internal/infra/pg/testcont"
+	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
+	testcont2 "github.com/dlomanov/gophkeeper/internal/infra/testcont"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -37,8 +37,8 @@ func (s *EntryTestSuit) SetupSuite() {
 	s.logger = zaptest.NewLogger(s.T(), zaptest.Level(zap.DebugLevel))
 	s.teardownCtx, s.teardown = context.WithCancel(context.Background())
 
-	dsn := testcont.PostgresDSN
-	s.pgc, dsn, _ = testcont.RunPostgres(s.teardownCtx, dsn)
+	dsn := testcont2.PostgresDSN
+	s.pgc, dsn, _ = testcont2.RunPostgres(s.teardownCtx, dsn)
 	s.db, _ = sqlx.ConnectContext(s.teardownCtx, "pgx", dsn)
 
 	ms, err := migrations.GetMigrations()
@@ -54,7 +54,7 @@ func (s *EntryTestSuit) TearDownSuite() {
 		s.logger.Error("failed to close postgres db", zap.Error(err))
 	}
 
-	timeout, cancel := context.WithTimeout(context.Background(), testcont.TeardownTimeout)
+	timeout, cancel := context.WithTimeout(context.Background(), testcont2.TeardownTimeout)
 	defer cancel()
 	if err := s.pgc.Terminate(timeout); err != nil {
 		s.logger.Error("failed to terminate postgres container", zap.Error(err))

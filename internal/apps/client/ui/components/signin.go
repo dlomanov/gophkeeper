@@ -1,12 +1,12 @@
-package ui
+package components
 
 import (
 	"context"
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/infra/services/mem"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
-	"github.com/patrickmn/go-cache"
 	"strings"
 	"time"
 )
@@ -16,7 +16,7 @@ var _ Component = (*SignIn)(nil)
 type (
 	SignIn struct {
 		userUC *usecases.UserUC
-		cache  *cache.Cache
+		cache  *mem.Cache
 
 		title      string
 		back       Component
@@ -34,7 +34,7 @@ func NewSignIn(
 	title string,
 	back Component,
 	userUC *usecases.UserUC,
-	cache *cache.Cache,
+	cache *mem.Cache,
 ) *SignIn {
 	c := &SignIn{
 		title:  title,

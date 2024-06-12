@@ -10,7 +10,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/grpcserver"
 	sharedmd "github.com/dlomanov/gophkeeper/internal/apps/shared/md"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
-	"github.com/dlomanov/gophkeeper/internal/infra/pg/testcont"
+	"github.com/dlomanov/gophkeeper/internal/infra/testcont"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

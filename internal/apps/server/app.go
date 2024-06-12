@@ -9,7 +9,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/grpcserver"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
 	"github.com/dlomanov/gophkeeper/internal/infra/logging"
-	"github.com/dlomanov/gophkeeper/internal/infra/pg/migrator"
+	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
 	"go.uber.org/zap"
 	"net"
 	"os"

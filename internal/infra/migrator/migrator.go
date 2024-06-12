@@ -2,8 +2,6 @@ package migrator
 
 import (
 	"database/sql"
-
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/lopezator/migrator"
 	"go.uber.org/zap"
 )

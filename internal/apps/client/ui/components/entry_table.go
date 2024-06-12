@@ -1,12 +1,12 @@
-package ui
+package components
 
 import (
 	"context"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
-	"github.com/dlomanov/gophkeeper/internal/entities"
 	"github.com/google/uuid"
 	"slices"
 	"strings"
@@ -14,10 +14,10 @@ import (
 	"time"
 )
 
-var _ Component = (*Table)(nil)
+var _ Component = (*EntryTable)(nil)
 
 type (
-	Table struct {
+	EntryTable struct {
 		title      string
 		back       Component
 		table      table.Model
@@ -31,18 +31,16 @@ type (
 		err     error
 	}
 	deleteMsg struct {
-		err     error
-		id      uuid.UUID
-		version int64
+		err error
 	}
 )
 
-func NewTable(
+func NewEntryTable(
 	title string,
 	back Component,
 	entryUC *usecases.EntryUC,
-) *Table {
-	c := &Table{
+) *EntryTable {
+	c := &EntryTable{
 		title:   title,
 		back:    back,
 		entryUC: entryUC,
@@ -51,16 +49,16 @@ func NewTable(
 	return c
 }
 
-func (c *Table) Title() string {
+func (c *EntryTable) Title() string {
 	return c.title
 }
 
-func (c *Table) Init() tea.Cmd {
+func (c *EntryTable) Init() tea.Cmd {
 	c.reset()
 	return c.refreshCmd()
 }
 
-func (c *Table) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
+func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		k := msg.String()
 		switch k {
@@ -88,7 +86,7 @@ func (c *Table) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 
 			// create
 			if idx == -1 {
-				result.Next = NewCreateCard(
+				result.Next = NewEntryCreateCard(
 					c.title+"/create",
 					c,
 					c.entryUC,
@@ -97,7 +95,7 @@ func (c *Table) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 			}
 
 			// update
-			result.Next = NewUpdateCard(
+			result.Next = NewEntryUpdateCard(
 				c.title+"/update",
 				c,
 				c.entryUC,
@@ -166,7 +164,7 @@ func (c *Table) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 	return result, cmd
 }
 
-func (c *Table) View() string {
+func (c *EntryTable) View() string {
 	sb := strings.Builder{}
 	sb.WriteString(c.table.View())
 	sb.WriteByte('\n')
@@ -179,11 +177,11 @@ func (c *Table) View() string {
 	return sb.String()
 }
 
-func (c *Table) SetPrev(back Component) {
+func (c *EntryTable) SetPrev(back Component) {
 	c.back = back
 }
 
-func (c *Table) newTable() table.Model {
+func (c *EntryTable) newTable() table.Model {
 	columns := []table.Column{
 		{Title: "Key", Width: 15},
 		{Title: "Description", Width: 30},
@@ -208,12 +206,12 @@ func (c *Table) newTable() table.Model {
 	return t
 }
 
-func (c *Table) reset() {
+func (c *EntryTable) reset() {
 	c.table.Blur()
 	c.table.SetRows(nil)
 }
 
-func (c *Table) refreshCmd() tea.Cmd {
+func (c *EntryTable) refreshCmd() tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
@@ -225,18 +223,11 @@ func (c *Table) refreshCmd() tea.Cmd {
 	}
 }
 
-func (c *Table) deleteCmd(id uuid.UUID) tea.Cmd {
+func (c *EntryTable) deleteCmd(id uuid.UUID) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		response, err := c.entryUC.Delete(ctx, usecases.DeleteEntryRequest{ID: id})
-		if err != nil {
-			return deleteMsg{err: err}
-		}
-		return deleteMsg{
-			id:      response.ID,
-			version: response.Version,
-			err:     nil,
-		}
+		err := c.entryUC.Delete(ctx, usecases.DeleteEntryRequest{ID: id})
+		return deleteMsg{err: err}
 	}
 }
