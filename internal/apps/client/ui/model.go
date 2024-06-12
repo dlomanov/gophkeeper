@@ -16,7 +16,7 @@ type Model struct {
 
 func NewModel(c *deps.Container) Model {
 	main := components.NewMain("gophkeeper", nil)
-	table := components.NewEntryTable("gophkeeper/entries", nil, c.EntryUC)
+	table := components.NewEntryTable("gophkeeper/entries", nil, c.EntryUC, c.Logger)
 	settings := components.NewSettings("gophkeeper/settings", nil)
 	signUp := components.NewSignUp("gophkeeper/sync/sign-up", nil, c.UserUC, c.Memcache)
 	signIn := components.NewSignIn("gophkeeper/sync/sign-in", nil, c.UserUC, c.Memcache)
@@ -38,7 +38,6 @@ func NewModel(c *deps.Container) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	// TODO: possible spot for start background
 	return m.curr.Init()
 }
 
@@ -53,12 +52,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch {
 	case res.Next != nil:
 		m.curr = res.Next
+		m.status = ""
 		cmd = m.curr.Init()
 	case res.Prev != nil:
 		m.curr = res.Prev
+		m.status = ""
 		cmd = m.curr.Init()
 	case res.Jump != nil:
 		m.curr = res.Jump
+		m.status = ""
 		cmd = m.curr.Init()
 	}
 	if res.Status != "" {

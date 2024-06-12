@@ -27,7 +27,7 @@ type (
 		metaInput  textarea.Model
 		dataInput  textarea.Model
 		inputCount int
-		creating   atomic.Int64
+		syncing    atomic.Int64
 	}
 	updateEntryMsg struct {
 		err error
@@ -60,6 +60,7 @@ func (c *EntryUpdateCard) Title() string {
 }
 
 func (c *EntryUpdateCard) Init() tea.Cmd {
+	c.syncing.Store(0)
 	return c.reset()
 }
 
@@ -68,9 +69,17 @@ func (c *EntryUpdateCard) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd)
 		k := msg.String()
 		switch k {
 		case "q", "ctrl+c":
+			if c.syncing.Load() != 0 {
+				result.Status = result.Status + "."
+				return result, nil
+			}
 			result.Quitting = true
 			return result, tea.Quit
 		case "esc":
+			if c.syncing.Load() != 0 {
+				result.Status = result.Status + "."
+				return result, nil
+			}
 			result.Prev = c.back
 			return result, nil
 		case "tab", "shift+tab", "enter", "up", "down":
@@ -79,7 +88,7 @@ func (c *EntryUpdateCard) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd)
 					result.Status = "invalid inputs"
 					return result, c.updateEntryCmd()
 				}
-				if !c.creating.CompareAndSwap(0, 1) {
+				if !c.syncing.CompareAndSwap(0, 1) {
 					result.Status = "entry creation in progress"
 					return result, nil
 				}
@@ -117,7 +126,7 @@ func (c *EntryUpdateCard) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd)
 	}
 
 	if msg, ok := msg.(updateEntryMsg); ok {
-		c.creating.Store(0)
+		c.syncing.Store(0)
 		if msg.err != nil {
 			result.Status = msg.err.Error()
 			return result, nil

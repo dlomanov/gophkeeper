@@ -272,6 +272,8 @@ func (uc *EntryUC) pushEntry(ctx context.Context, id uuid.UUID) error {
 			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrEntryInvalid, err)
 		case status.Code(err) == codes.AlreadyExists:
 			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrEntryExists, err)
+		case status.Code(err) == codes.Unavailable:
+			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrServerUnavailable, err)
 		case err != nil:
 			return fmt.Errorf("entry_usecase: failed to create entry: %w", err)
 		}
@@ -291,6 +293,8 @@ func (uc *EntryUC) pushEntry(ctx context.Context, id uuid.UUID) error {
 			return fmt.Errorf("entry_usecase: failed to update entry: %w: %w", entities.ErrEntryInvalid, err)
 		case status.Code(err) == codes.NotFound:
 			return fmt.Errorf("entry_usecase: failed to update entry: %w: %w", entities.ErrEntryNotFound, err)
+		case status.Code(err) == codes.Unavailable:
+			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrServerUnavailable, err)
 		case err != nil:
 			return fmt.Errorf("entry_usecase: failed to update entry: %w", err)
 		}
@@ -301,6 +305,8 @@ func (uc *EntryUC) pushEntry(ctx context.Context, id uuid.UUID) error {
 			return fmt.Errorf("entry_usecase: failed to delete entry: %w: %w", entities.ErrEntryInvalid, err)
 		case status.Code(err) == codes.NotFound:
 			return fmt.Errorf("entry_usecase: failed to delete entry: %w: %w", entities.ErrEntryNotFound, err)
+		case status.Code(err) == codes.Unavailable:
+			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrServerUnavailable, err)
 		case err != nil:
 			return fmt.Errorf("entry_usecase: failed to delete entry: %w", err)
 		}
@@ -323,7 +329,10 @@ func (uc *EntryUC) fetch(ctx context.Context) error {
 		}
 	}
 	resp, err := uc.entryClient.GetDiff(ctx, &pb.GetEntriesDiffRequest{Versions: versions})
-	if err != nil {
+	switch {
+	case status.Code(err) == codes.Unavailable:
+		return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrServerUnavailable, err)
+	case err != nil:
 		return fmt.Errorf("entry_usecase: failed to get diff: %w", err)
 	}
 	entryMap := make(map[string]*pb.Entry)

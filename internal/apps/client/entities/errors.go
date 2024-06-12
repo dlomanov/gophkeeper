@@ -13,4 +13,5 @@ var (
 	ErrUserExists            = apperrors.NewInvalid("user already exists")
 	ErrUserCredsInvalid      = apperrors.NewInvalid("user credentials are invalid")
 	ErrUserTokenNotFound     = apperrors.NewNotFound("token not found")
+	ErrServerUnavailable     = apperrors.NewInternal("server unavailable")
 )

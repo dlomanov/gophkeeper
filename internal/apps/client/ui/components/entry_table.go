@@ -2,12 +2,15 @@ package components
 
 import (
 	"context"
+	"errors"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
 	"github.com/google/uuid"
+	"go.uber.org/multierr"
+	"go.uber.org/zap"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -18,15 +21,15 @@ var _ Component = (*EntryTable)(nil)
 
 type (
 	EntryTable struct {
-		title      string
-		back       Component
-		table      table.Model
-		entryUC    *usecases.EntryUC
-		entries    []entities.Entry
-		refreshing atomic.Int64
-		deleting   atomic.Int64
+		title   string
+		back    Component
+		table   table.Model
+		logger  *zap.Logger
+		entryUC *usecases.EntryUC
+		entries []entities.Entry
+		syncing atomic.Int64
 	}
-	refreshMsg struct {
+	syncMsg struct {
 		entries []entities.Entry
 		err     error
 	}
@@ -39,11 +42,13 @@ func NewEntryTable(
 	title string,
 	back Component,
 	entryUC *usecases.EntryUC,
+	logger *zap.Logger,
 ) *EntryTable {
 	c := &EntryTable{
 		title:   title,
 		back:    back,
 		entryUC: entryUC,
+		logger:  logger,
 	}
 	c.table = c.newTable()
 	return c
@@ -55,7 +60,8 @@ func (c *EntryTable) Title() string {
 
 func (c *EntryTable) Init() tea.Cmd {
 	c.reset()
-	return c.refreshCmd()
+	c.syncing.Store(1)
+	return c.syncCmd()
 }
 
 func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
@@ -63,20 +69,28 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 		k := msg.String()
 		switch k {
 		case "q", "ctrl+c":
+			if c.syncing.Load() != 0 {
+				result.Status = result.Status + "."
+				return result, nil
+			}
 			result.Quitting = true
 			return result, tea.Quit
 		case "esc":
-			if c.table.Focused() {
-				c.table.Blur()
-			} else {
-				result.Prev = c.back
+			if c.syncing.Load() != 0 {
+				result.Status = result.Status + "."
 				return result, nil
 			}
+			result.Prev = c.back
+			return result, nil
 		case "j", "k", "up", "down":
 			if !c.table.Focused() {
 				c.table.Focus()
 			}
 		case "enter":
+			if c.syncing.Load() != 0 {
+				result.Status = result.Status + "."
+				return result, nil
+			}
 			row := c.table.SelectedRow()
 			if len(row) == 0 {
 				return result, nil
@@ -102,14 +116,18 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 				c.entries[idx],
 			)
 			return result, nil
-		case "u", "U":
-			if c.refreshing.CompareAndSwap(0, 1) {
-				result.Status = "refreshing 1"
-				return result, c.refreshCmd()
+		case "s", "S":
+			if c.syncing.CompareAndSwap(0, 1) {
+				result.Status = result.Status + "."
+				return result, c.syncCmd()
 			}
-			result.Status = "refreshing 2"
+			result.Status = "syncing 2"
 			return result, nil
 		case "delete", "d":
+			if !c.syncing.CompareAndSwap(0, 1) {
+				result.Status = result.Status + "."
+				return result, nil
+			}
 			row := c.table.SelectedRow()
 			if len(row) == 0 {
 				return result, nil
@@ -119,22 +137,22 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 			if idx == -1 {
 				return result, nil
 			}
-			if !c.deleting.CompareAndSwap(0, 1) {
-				result.Status = "deleting 1"
-				return result, nil
-			}
 			result.Status = "deleting..."
 			id := c.entries[idx].ID
 			return result, c.deleteCmd(id)
 		}
 	}
 
-	if msg, ok := msg.(refreshMsg); ok {
-		c.refreshing.Store(0)
+	if msg, ok := msg.(syncMsg); ok {
+		c.syncing.Store(0)
+		result.Status = "synced"
 		if msg.err != nil {
-			c.entries = nil
-			result.Status = msg.err.Error()
-			return result, nil
+			switch {
+			case errors.Is(msg.err, entities.ErrServerUnavailable):
+				result.Status = "server unavailable"
+			default:
+				result.Status = msg.err.Error() // TODO: internal error
+			}
 		}
 		c.entries = msg.entries
 		rows := make([]table.Row, len(c.entries)+1)
@@ -143,21 +161,21 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 			rows[i+1] = table.Row{
 				entry.Key,
 				entry.Meta["description"],
+				entry.UpdatedAt.Format(time.DateTime),
 			}
 		}
 		c.table.SetRows(rows)
-		result.Status = "table updated"
 		return result, nil
 	}
 
 	if msg, ok := msg.(deleteMsg); ok {
-		c.deleting.Store(0)
+		c.syncing.Store(0)
 		if msg.err != nil {
 			result.Status = msg.err.Error()
 			return result, nil
 		}
 		result.Status = "entry deleted"
-		return result, c.refreshCmd()
+		return result, c.syncCmd()
 	}
 
 	c.table, cmd = c.table.Update(msg)
@@ -185,10 +203,10 @@ func (c *EntryTable) newTable() table.Model {
 	columns := []table.Column{
 		{Title: "Key", Width: 15},
 		{Title: "Description", Width: 30},
+		{Title: "Updated", Width: 25},
 	}
 	t := table.New(
 		table.WithColumns(columns),
-		//table.WithRows(rows),
 		table.WithFocused(true),
 		table.WithHeight(7),
 	)
@@ -211,23 +229,29 @@ func (c *EntryTable) reset() {
 	c.table.SetRows(nil)
 }
 
-func (c *EntryTable) refreshCmd() tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		resp, err := c.entryUC.GetAll(ctx)
-		if err != nil {
-			return refreshMsg{err: err}
-		}
-		return refreshMsg{entries: resp.Entries}
-	}
-}
-
 func (c *EntryTable) deleteCmd(id uuid.UUID) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		err := c.entryUC.Delete(ctx, usecases.DeleteEntryRequest{ID: id})
 		return deleteMsg{err: err}
+	}
+}
+
+func (c *EntryTable) syncCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		var merr error
+		if err := c.entryUC.Sync(ctx); err != nil {
+			c.logger.Error("failed to sync entries", zap.Error(err))
+			merr = multierr.Append(merr, err)
+		}
+		resp, err := c.entryUC.GetAll(ctx)
+		if err != nil {
+			merr = multierr.Append(merr, err)
+			return syncMsg{err: merr}
+		}
+		return syncMsg{entries: resp.Entries, err: merr}
 	}
 }
