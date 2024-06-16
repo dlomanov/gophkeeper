@@ -2,6 +2,8 @@ package repo
 
 import (
 	"context"
+	trmsqlx "github.com/avito-tech/go-transaction-manager/drivers/sqlx/v2"
+	"github.com/avito-tech/go-transaction-manager/trm/v2/manager"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/migrations"
 	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
@@ -36,14 +38,16 @@ func (s *KVPairRepoTestSuit) TearDownSuite() {
 	require.NoError(s.T(), err, "failed to close database")
 }
 
-func TestKVPairRepo(t *testing.T) {
+func Test(t *testing.T) {
 	suite.Run(t, new(KVPairRepoTestSuit))
 }
 
 func (s *KVPairRepoTestSuit) TestMethods() {
 	ctx := context.Background()
 
-	sut := NewKVPairRepo(s.db)
+	trm, err := manager.New(trmsqlx.NewDefaultFactory(s.db))
+	require.NoError(s.T(), err, "failed to create transaction manager")
+	sut := NewKVPairRepo(s.db, trmsqlx.DefaultCtxGetter, trm)
 	pairs, err := sut.Load(ctx)
 	require.NoError(s.T(), err, "failed to load pairs")
 	require.Empty(s.T(), pairs, "pairs should be empty")
@@ -66,4 +70,23 @@ func (s *KVPairRepoTestSuit) TestMethods() {
 	for _, pair := range pairs {
 		require.Equal(s.T(), pair.Value, m[pair.Key], "pairs should be equal")
 	}
+
+	v1, err := sut.Get(ctx, "key1")
+	require.NoError(s.T(), err, "failed to get value")
+	require.Equal(s.T(), v1, m["key1"], "value should be equal")
+
+	err = sut.Set(ctx, "key1", "value1_new")
+	require.NoError(s.T(), err, "failed to set value")
+	v1, err = sut.Get(ctx, "key1")
+	require.NoError(s.T(), err, "failed to get value")
+	require.Equal(s.T(), v1, "value1_new", "value should be equal")
+
+	err = sut.Set(ctx, "key4", "value4")
+	require.NoError(s.T(), err, "failed to set value")
+	v4, err := sut.Get(ctx, "key4")
+	require.NoError(s.T(), err, "failed to get value")
+	require.Equal(s.T(), v4, "value4", "value should be equal")
+
+	_, err = sut.Get(ctx, "key5")
+	require.ErrorIs(s.T(), err, entities.ErrKVPairNotFound, "expected not found error")
 }

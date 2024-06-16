@@ -80,7 +80,7 @@ func (s *UserTestSuit) TestUserRepo() {
 	user := must(s.T(), func() (*entities.User, error) {
 		return entities.NewUser(entities.HashCreds{
 			Login:    login,
-			PassHash: "hash",
+			PassHash: []byte("hash"),
 		})
 	})
 

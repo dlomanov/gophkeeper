@@ -16,7 +16,7 @@ func UseServices(s *grpcserver2.Server, c *deps.Container) {
 
 func GetOptions(c *deps.Container) grpcserver2.Option {
 	return grpcserver2.ServerOptions(grpc.ChainUnaryInterceptor(
-		interceptor.Auth(c.UserUC),
+		interceptor.Auth(c.Logger, c.UserUC),
 		interceptor.Logger(c.Logger),
 		interceptor.Recovery(c.Logger),
 	))

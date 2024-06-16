@@ -7,6 +7,7 @@ import (
 	trmsqlx "github.com/avito-tech/go-transaction-manager/drivers/sqlx/v2"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"time"
@@ -111,7 +112,7 @@ func (*UserRepo) toEntity(row userRow) entities.User {
 		ID: row.ID,
 		HashCreds: entities.HashCreds{
 			Login:    entities.Login(row.Login),
-			PassHash: entities.PassHash(row.PassHash),
+			PassHash: core.PassHash(row.PassHash),
 		},
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,

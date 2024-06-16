@@ -19,7 +19,7 @@ type (
 	EntryCreateCard struct {
 		title      string
 		back       Component
-		entryUC    *usecases.EntryUC
+		entryUC    EntryCreateUC
 		focusIndex int
 		keyInput   textinput.Model
 		typeInput  textinput.Model
@@ -27,6 +27,9 @@ type (
 		dataInput  textarea.Model
 		inputCount int
 		syncing    atomic.Int64
+	}
+	EntryCreateUC interface {
+		Create(ctx context.Context, request usecases.CreateEntryRequest) (usecases.CreateEntryResponse, error)
 	}
 	createEntryMsg struct {
 		id      uuid.UUID
@@ -38,7 +41,7 @@ type (
 func NewEntryCreateCard(
 	title string,
 	back Component,
-	entryUC *usecases.EntryUC,
+	entryUC EntryCreateUC,
 ) *EntryCreateCard {
 	c := &EntryCreateCard{
 		title:      title,

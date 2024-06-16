@@ -9,6 +9,9 @@ type Config struct {
 	LogOutputPaths []string // logger output paths
 	Cert           []byte   // TLS certificate
 	DSN            string   // database DSN
+	BuildVersion   string   // build version info
+	BuildDate      string   // build date info
+	BuildCommit    string   // build commit info
 }
 
 func (c Config) Validate() error {

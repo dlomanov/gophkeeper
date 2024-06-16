@@ -13,7 +13,7 @@ var (
 	subtleStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	ticksStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("79"))
 	checkboxStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
-	mainStyle     = lipgloss.NewStyle().MarginLeft(2)
+	MainStyle     = lipgloss.NewStyle().MarginLeft(2)
 	dotStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("236")).Render(dotChar)
 
 	focusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -23,7 +23,7 @@ var (
 
 	noStyle     = lipgloss.NewStyle()
 	helpStyle   = blurredStyle
-	statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+	StatusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
 
 	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 

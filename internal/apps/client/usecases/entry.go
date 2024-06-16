@@ -274,6 +274,8 @@ func (uc *EntryUC) pushEntry(ctx context.Context, id uuid.UUID) error {
 			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrEntryExists, err)
 		case status.Code(err) == codes.Unavailable:
 			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrServerUnavailable, err)
+		case status.Code(err) == codes.Unauthenticated:
+			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrUserTokenInvalid, err)
 		case err != nil:
 			return fmt.Errorf("entry_usecase: failed to create entry: %w", err)
 		}
@@ -295,6 +297,8 @@ func (uc *EntryUC) pushEntry(ctx context.Context, id uuid.UUID) error {
 			return fmt.Errorf("entry_usecase: failed to update entry: %w: %w", entities.ErrEntryNotFound, err)
 		case status.Code(err) == codes.Unavailable:
 			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrServerUnavailable, err)
+		case status.Code(err) == codes.Unauthenticated:
+			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrUserTokenInvalid, err)
 		case err != nil:
 			return fmt.Errorf("entry_usecase: failed to update entry: %w", err)
 		}
@@ -307,6 +311,8 @@ func (uc *EntryUC) pushEntry(ctx context.Context, id uuid.UUID) error {
 			return fmt.Errorf("entry_usecase: failed to delete entry: %w: %w", entities.ErrEntryNotFound, err)
 		case status.Code(err) == codes.Unavailable:
 			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrServerUnavailable, err)
+		case status.Code(err) == codes.Unauthenticated:
+			return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrUserTokenInvalid, err)
 		case err != nil:
 			return fmt.Errorf("entry_usecase: failed to delete entry: %w", err)
 		}
@@ -332,6 +338,8 @@ func (uc *EntryUC) fetch(ctx context.Context) error {
 	switch {
 	case status.Code(err) == codes.Unavailable:
 		return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrServerUnavailable, err)
+	case status.Code(err) == codes.Unauthenticated:
+		return fmt.Errorf("entry_usecase: failed to create entry: %w: %w", entities.ErrUserTokenInvalid, err)
 	case err != nil:
 		return fmt.Errorf("entry_usecase: failed to get diff: %w", err)
 	}

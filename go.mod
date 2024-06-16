@@ -84,6 +84,7 @@ require (
 )
 
 require (
+	github.com/CovenantSQL/go-sqlite3-encrypt v1.9.0
 	github.com/avito-tech/go-transaction-manager/drivers/sqlx/v2 v2.0.0-rc8
 	github.com/avito-tech/go-transaction-manager/trm/v2 v2.0.0-rc8
 	github.com/charmbracelet/bubbles v0.18.0

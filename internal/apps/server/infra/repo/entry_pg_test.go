@@ -71,7 +71,7 @@ func (s *EntryTestSuit) TestEntryRepo() {
 
 	user, err := entities.NewUser(entities.HashCreds{
 		Login:    "test_user",
-		PassHash: "test_password_hash",
+		PassHash: []byte("test_password_hash"),
 	})
 	require.NoError(s.T(), err, "no error expected when creating user")
 	userRepo := repo.NewUserRepo(s.db, trmsqlx.DefaultCtxGetter)

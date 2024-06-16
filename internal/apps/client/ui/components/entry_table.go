@@ -25,9 +25,16 @@ type (
 		back    Component
 		table   table.Model
 		logger  *zap.Logger
-		entryUC *usecases.EntryUC
+		entryUC EntryUC
 		entries []entities.Entry
 		syncing atomic.Int64
+	}
+	EntryUC interface {
+		EntryCreateUC
+		EntryUpdateUC
+		Sync(ctx context.Context) error
+		GetAll(ctx context.Context) (usecases.GetEntriesResponse, error)
+		Delete(ctx context.Context, request usecases.DeleteEntryRequest) error
 	}
 	syncMsg struct {
 		entries []entities.Entry
@@ -41,7 +48,7 @@ type (
 func NewEntryTable(
 	title string,
 	back Component,
-	entryUC *usecases.EntryUC,
+	entryUC EntryUC,
 	logger *zap.Logger,
 ) *EntryTable {
 	c := &EntryTable{
@@ -70,14 +77,14 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 		switch k {
 		case "q", "ctrl+c":
 			if c.syncing.Load() != 0 {
-				result.Status = result.Status + "."
+				result.Status = "🤔"
 				return result, nil
 			}
 			result.Quitting = true
 			return result, tea.Quit
 		case "esc":
 			if c.syncing.Load() != 0 {
-				result.Status = result.Status + "."
+				result.Status = "🤔"
 				return result, nil
 			}
 			result.Prev = c.back
@@ -88,7 +95,7 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 			}
 		case "enter":
 			if c.syncing.Load() != 0 {
-				result.Status = result.Status + "."
+				result.Status = "🤔"
 				return result, nil
 			}
 			row := c.table.SelectedRow()
@@ -118,14 +125,14 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 			return result, nil
 		case "s", "S":
 			if c.syncing.CompareAndSwap(0, 1) {
-				result.Status = result.Status + "."
+				result.Status = "🤔"
 				return result, c.syncCmd()
 			}
-			result.Status = "syncing 2"
+			result.Status = "🤔"
 			return result, nil
 		case "delete", "d":
 			if !c.syncing.CompareAndSwap(0, 1) {
-				result.Status = result.Status + "."
+				result.Status = "🤔"
 				return result, nil
 			}
 			row := c.table.SelectedRow()
@@ -137,7 +144,7 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 			if idx == -1 {
 				return result, nil
 			}
-			result.Status = "deleting..."
+			result.Status = "🤔"
 			id := c.entries[idx].ID
 			return result, c.deleteCmd(id)
 		}
@@ -145,13 +152,15 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 
 	if msg, ok := msg.(syncMsg); ok {
 		c.syncing.Store(0)
-		result.Status = "synced"
+		result.Status = "synced 🦾"
 		if msg.err != nil {
 			switch {
 			case errors.Is(msg.err, entities.ErrServerUnavailable):
-				result.Status = "server unavailable"
+				result.Status = "can't sync 🤨: server unavailable, try again later 🤔"
+			case errors.Is(msg.err, entities.ErrUserTokenInvalid):
+				result.Status = "can't sync 🤨: token expired, try sign in 🤔"
 			default:
-				result.Status = msg.err.Error() // TODO: internal error
+				result.Status = "can't sync 🤨: internal server error 💀"
 			}
 		}
 		c.entries = msg.entries

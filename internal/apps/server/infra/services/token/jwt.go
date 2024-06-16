@@ -1,6 +1,7 @@
 package token
 
 import (
+	"errors"
 	"fmt"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
@@ -52,12 +53,17 @@ func (t JWTTokener) GetUserID(token entities.Token) (uuid.UUID, error) {
 
 	value, err := jwt.ParseWithClaims(string(token), c, func(token *jwt.Token) (any, error) {
 		if m, ok := token.Method.(*jwt.SigningMethodHMAC); !ok || m.Name != method.Name {
-			return nil, fmt.Errorf("%w unexpected signing method: %v", entities.ErrUserTokenInvalid, token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return t.secret, nil
 	})
-	if err != nil {
-		return uuid.Nil, err
+	switch {
+	case errors.Is(err, jwt.ErrTokenExpired):
+		return uuid.Nil, entities.ErrUserTokenExpired
+	case errors.Is(err, jwt.ErrTokenExpired):
+		return uuid.Nil, entities.ErrUserTokenExpired
+	case err != nil:
+		return uuid.Nil, fmt.Errorf("%w: %w", entities.ErrUserTokenInvalid, err)
 	}
 	if !value.Valid {
 		return uuid.Nil, entities.ErrUserTokenInvalid

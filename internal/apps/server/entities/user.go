@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,15 +10,13 @@ import (
 type (
 	Creds struct {
 		Login Login
-		Pass  Pass
+		Pass  core.Pass
 	}
 	HashCreds struct {
 		Login    Login
-		PassHash PassHash
+		PassHash core.PassHash
 	}
 	Login     string
-	Pass      string
-	PassHash  string
 	UserToken struct {
 		UserID uuid.UUID
 		Token  Token
@@ -46,11 +45,11 @@ func NewUser(creds HashCreds) (*User, error) {
 }
 
 func (c Creds) Valid() bool {
-	return c.Login != "" && c.Pass != ""
+	return len(c.Login) != 0 && len(c.Pass) != 0
 }
 
 func (c HashCreds) Valid() bool {
-	return c.Login != "" && c.PassHash != ""
+	return len(c.Login) != 0 && len(c.PassHash) != 0
 }
 
 func (t Token) Valid() bool {

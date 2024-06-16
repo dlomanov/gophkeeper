@@ -4,36 +4,25 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/infra/deps"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components"
+	"strings"
 )
 
-type Model struct {
-	tea.Model
-	layout   *components.Layout
-	curr     components.Component
-	quitting bool
-	status   string
-}
+type (
+	Model struct {
+		tea.Model
+		c        *deps.Container
+		curr     components.Component
+		quitting bool
+		accepted bool
+		status   string
+	}
+)
 
 func NewModel(c *deps.Container) Model {
-	main := components.NewMain("gophkeeper", nil)
-	table := components.NewEntryTable("gophkeeper/entries", nil, c.EntryUC, c.Logger)
-	settings := components.NewSettings("gophkeeper/settings", nil)
-	signUp := components.NewSignUp("gophkeeper/sync/sign-up", nil, c.UserUC, c.Memcache)
-	signIn := components.NewSignIn("gophkeeper/sync/sign-in", nil, c.UserUC, c.Memcache)
-	menu := components.NewMenu("gophkeeper", main, []components.Nav{
-		{Name: "Sign-up", Next: signUp},
-		{Name: "Sign-in", Next: signIn},
-		{Name: "Entries", Next: table},
-		{Name: "Settings", Next: settings},
-	})
-	table.SetPrev(menu)
-	settings.SetPrev(menu)
-	signUp.SetPrev(menu)
-	signIn.SetPrev(menu)
-	main.SetNext(menu)
+	main := components.NewMain("gophkeeper", c)
 	return Model{
-		layout: components.NewLayout(),
-		curr:   main,
+		c:    c,
+		curr: main,
 	}
 }
 
@@ -49,6 +38,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	res, cmd := m.curr.Update(msg)
+	if res.PassAccepted && !m.accepted {
+		m.accepted = true
+		table := components.NewEntryTable("gophkeeper/entries", nil, m.c.EntryUC, m.c.Logger)
+		settings := components.NewSettings("gophkeeper/settings", nil)
+		signUp := components.NewSignUp("gophkeeper/sync/sign-up", nil, m.c.UserUC, m.c.Memcache)
+		signIn := components.NewSignIn("gophkeeper/sync/sign-in", nil, m.c.UserUC, m.c.Memcache)
+		menu := components.NewMenu("gophkeeper", []components.Nav{
+			{Name: "Sign-up", Next: signUp},
+			{Name: "Sign-in", Next: signIn},
+			{Name: "Entries", Next: table},
+			{Name: "Settings", Next: settings},
+		})
+		table.SetPrev(menu)
+		settings.SetPrev(menu)
+		signUp.SetPrev(menu)
+		signIn.SetPrev(menu)
+		m.curr = menu
+		return m, m.curr.Init()
+	}
 	switch {
 	case res.Next != nil:
 		m.curr = res.Next
@@ -72,5 +80,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	return m.layout.View(m.curr, m.quitting, m.status)
+	sb := strings.Builder{}
+	sb.WriteByte('\n')
+	sb.WriteString(m.curr.Title())
+	sb.WriteByte('\n')
+	sb.WriteByte('\n')
+	sb.WriteByte('\n')
+	sb.WriteByte('\n')
+	sb.WriteString(m.curr.View())
+	sb.WriteByte('\n')
+	sb.WriteByte('\n')
+	if m.quitting {
+		sb.WriteString(components.StatusStyle.Render("see you later! 😊\n\n"))
+	} else {
+		sb.WriteString(components.StatusStyle.Render(m.status))
+	}
+
+	return components.MainStyle.Render(sb.String())
 }

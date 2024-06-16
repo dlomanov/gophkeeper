@@ -10,7 +10,7 @@ import (
 func TestNewUser(t *testing.T) {
 	creds := entities.HashCreds{
 		Login:    "",
-		PassHash: "hashedPassword",
+		PassHash: []byte("hashedPassword"),
 	}
 	_, err := entities.NewUser(creds)
 	require.ErrorIs(t, err, entities.ErrUserCredsInvalid, "error mismatch")
@@ -58,7 +58,7 @@ func TestCredsValid(t *testing.T) {
 			name: "valid creds",
 			creds: entities.Creds{
 				Login: "testUser",
-				Pass:  "password",
+				Pass:  []byte("password"),
 			},
 			want: true,
 		},
@@ -66,7 +66,7 @@ func TestCredsValid(t *testing.T) {
 			name: "invalid creds",
 			creds: entities.Creds{
 				Login: "",
-				Pass:  "password",
+				Pass:  []byte("password"),
 			},
 			want: false,
 		},

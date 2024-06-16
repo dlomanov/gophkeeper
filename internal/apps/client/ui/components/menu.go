@@ -22,7 +22,6 @@ var _ Component = (*Menu)(nil)
 type (
 	Menu struct {
 		title  string
-		back   Component
 		navs   []Nav
 		list   list.Model
 		choice string
@@ -57,7 +56,7 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	_, _ = fmt.Fprint(w, fn(str))
 }
 
-func NewMenu(title string, back Component, navs []Nav) *Menu {
+func NewMenu(title string, navs []Nav) *Menu {
 	items := make([]list.Item, len(navs))
 	for i, nav := range navs {
 		items[i] = item(nav.Name)
@@ -71,7 +70,6 @@ func NewMenu(title string, back Component, navs []Nav) *Menu {
 	l.SetShowHelp(false)
 	return &Menu{
 		title: title,
-		back:  back,
 		navs:  navs,
 		list:  l,
 	}
@@ -98,10 +96,6 @@ func (c *Menu) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 		case "q", "ctrl+c":
 			result.Quitting = true
 			return result, tea.Quit
-		case "esc":
-			result.Jump = c.back
-			return result, nil
-
 		case "enter":
 			i, ok := c.list.SelectedItem().(item)
 			if ok {
@@ -127,8 +121,6 @@ func (c *Menu) View() string {
 	sb.WriteByte('\n')
 	sb.WriteByte('\n')
 	sb.WriteString(subtleStyle.Render("q: quit"))
-	sb.WriteString(dotStyle)
-	sb.WriteString(subtleStyle.Render("esc: back"))
 	sb.WriteByte('\n')
 	sb.WriteByte('\n')
 	return sb.String()

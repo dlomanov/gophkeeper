@@ -19,7 +19,7 @@ type (
 	EntryUpdateCard struct {
 		title      string
 		back       Component
-		entryUC    *usecases.EntryUC
+		entryUC    EntryUpdateUC
 		entry      entities.Entry
 		focusIndex int
 		keyInput   textinput.Model
@@ -29,6 +29,9 @@ type (
 		inputCount int
 		syncing    atomic.Int64
 	}
+	EntryUpdateUC interface {
+		Update(ctx context.Context, request usecases.UpdateEntryRequest) error
+	}
 	updateEntryMsg struct {
 		err error
 	}
@@ -37,7 +40,7 @@ type (
 func NewEntryUpdateCard(
 	title string,
 	back Component,
-	entryUC *usecases.EntryUC,
+	entryUC EntryUpdateUC,
 	entry entities.Entry,
 ) *EntryUpdateCard {
 	c := &EntryUpdateCard{

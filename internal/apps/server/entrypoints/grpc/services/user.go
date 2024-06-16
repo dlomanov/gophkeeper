@@ -6,6 +6,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
 	pb "github.com/dlomanov/gophkeeper/internal/apps/shared/proto"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/dlomanov/gophkeeper/internal/core/apperrors"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
 	"go.uber.org/zap"
@@ -40,7 +41,7 @@ func (s *UserService) SignUp(
 ) (*pb.SignUpUserResponse, error) {
 	creds := entities.Creds{
 		Login: entities.Login(request.Login),
-		Pass:  entities.Pass(request.Password),
+		Pass:  core.Pass(request.Password),
 	}
 
 	token, err := s.userUC.SignUp(ctx, creds)
@@ -63,7 +64,7 @@ func (s *UserService) SignUp(
 func (s *UserService) SignIn(ctx context.Context, request *pb.SignInUserRequest) (*pb.SignInUserResponse, error) {
 	creds := entities.Creds{
 		Login: entities.Login(request.Login),
-		Pass:  entities.Pass(request.Password),
+		Pass:  core.Pass(request.Password),
 	}
 
 	token, err := s.userUC.SignIn(ctx, creds)

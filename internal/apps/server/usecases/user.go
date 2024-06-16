@@ -2,8 +2,10 @@ package usecases
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
+	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -25,8 +27,8 @@ type (
 		Create(ctx context.Context, user entities.User) error
 	}
 	PassHasher interface {
-		Hash(password entities.Pass) (entities.PassHash, error)
-		Compare(password entities.Pass, hash entities.PassHash) bool
+		Hash(password core.Pass) (core.PassHash, error)
+		Compare(password core.Pass, hash core.PassHash) bool
 	}
 	Tokener interface {
 		Create(id uuid.UUID) (entities.Token, error)
@@ -115,7 +117,14 @@ func (uc *UserUC) SignIn(
 
 func (uc *UserUC) GetUserID(_ context.Context, token entities.Token) (uuid.UUID, error) {
 	userID, err := uc.tokener.GetUserID(token)
-	if err != nil {
+	switch {
+	case errors.Is(err, entities.ErrUserTokenInvalid):
+		uc.logger.Debug("invalid token", zap.Error(err))
+		return uuid.Nil, fmt.Errorf("user_usecase: %w", err)
+	case errors.Is(err, entities.ErrUserTokenExpired):
+		uc.logger.Debug("token expired", zap.Error(err))
+		return uuid.Nil, fmt.Errorf("user_usecase: %w", err)
+	case err != nil:
 		uc.logger.Error("failed to get userID from token", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("user_usecase: failed to get userID from token: %w", err)
 	}

@@ -2,6 +2,7 @@ package interceptor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	sharedmd "github.com/dlomanov/gophkeeper/internal/apps/shared/md"
@@ -59,16 +60,25 @@ type Tokener interface {
 	GetUserID(ctx context.Context, token entities.Token) (uuid.UUID, error)
 }
 
-func Auth(tokener Tokener) grpc.UnaryServerInterceptor {
+func Auth(logger *zap.Logger, tokener Tokener) grpc.UnaryServerInterceptor {
 	return auth.UnaryServerInterceptor(func(ctx context.Context) (context.Context, error) {
 		t, err := auth.AuthFromMD(ctx, sharedmd.Schema)
 		if err != nil {
-			return ctx, fmt.Errorf("auth: failed to get token: %w", err)
+			logger.Debug("failed to get token from metadata", zap.Error(err))
+			return ctx, status.Error(codes.Unauthenticated, err.Error())
 		}
 		token := entities.Token(t)
 		userID, err := tokener.GetUserID(ctx, token)
-		if err != nil {
-			return ctx, fmt.Errorf("auth: failed to get user ID from token: %w", err)
+		switch {
+		case errors.Is(err, entities.ErrUserTokenInvalid):
+			logger.Debug("invalid token", zap.Error(err))
+			return ctx, status.Error(codes.Unauthenticated, err.Error())
+		case errors.Is(err, entities.ErrUserTokenExpired):
+			logger.Debug("token expired", zap.Error(err))
+			return ctx, status.Error(codes.Unauthenticated, err.Error())
+		case err != nil:
+			logger.Error("failed to get user ID from token", zap.Error(err))
+			return ctx, status.Error(codes.Internal, "internal server error")
 		}
 		return context.WithValue(ctx, UserIDKey, userID), nil
 	})

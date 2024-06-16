@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
-	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/pass"
+	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/pass"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/services/token"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/usecases"
 	"github.com/google/uuid"
@@ -38,7 +38,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionRegister,
 				creds: entities.Creds{
 					Login: "",
-					Pass:  "1",
+					Pass:  []byte("1"),
 				},
 			},
 			want: want{err: entities.ErrUserCredsInvalid},
@@ -49,7 +49,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionRegister,
 				creds: entities.Creds{
 					Login: "admin",
-					Pass:  "",
+					Pass:  []byte(""),
 				},
 			},
 			want: want{err: entities.ErrUserCredsInvalid},
@@ -60,7 +60,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionRegister,
 				creds: entities.Creds{
 					Login: "",
-					Pass:  "",
+					Pass:  []byte(""),
 				},
 			},
 			want: want{err: entities.ErrUserCredsInvalid},
@@ -71,7 +71,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionRegister,
 				creds: entities.Creds{
 					Login: "admin",
-					Pass:  "1",
+					Pass:  []byte("1"),
 				},
 			},
 			want: want{err: nil},
@@ -82,7 +82,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionRegister,
 				creds: entities.Creds{
 					Login: "admin",
-					Pass:  "1",
+					Pass:  []byte("1"),
 				},
 			},
 			want: want{err: entities.ErrUserExists},
@@ -93,7 +93,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionRegister,
 				creds: entities.Creds{
 					Login: "admin2",
-					Pass:  "1",
+					Pass:  []byte("1"),
 				},
 			},
 			want: want{err: nil},
@@ -104,7 +104,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionLogin,
 				creds: entities.Creds{
 					Login: "admin",
-					Pass:  "1",
+					Pass:  []byte("1"),
 				},
 			},
 			want: want{err: entities.ErrUserCredsInvalid},
@@ -115,7 +115,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionLogin,
 				creds: entities.Creds{
 					Login: "admin",
-					Pass:  "",
+					Pass:  []byte(""),
 				},
 			},
 			want: want{err: entities.ErrUserCredsInvalid},
@@ -126,7 +126,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionLogin,
 				creds: entities.Creds{
 					Login: "admin",
-					Pass:  "",
+					Pass:  []byte(""),
 				},
 			},
 			want: want{err: entities.ErrUserCredsInvalid},
@@ -137,7 +137,7 @@ func TestUserUC(t *testing.T) {
 				action: ActionLogin,
 				creds: entities.Creds{
 					Login: "admin",
-					Pass:  "1",
+					Pass:  []byte("1"),
 				},
 			},
 			want: want{err: nil},
