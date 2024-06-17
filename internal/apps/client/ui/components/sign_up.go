@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/infra/services/mem"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
 	"strings"
@@ -178,7 +179,7 @@ func (c *SignUp) signUpCmd(login, pass string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		err := c.userUC.SignUp(ctx, usecases.SignUpUserRequest{
+		err := c.userUC.SignUp(ctx, entities.SignUpUserRequest{
 			Login:    login,
 			Password: pass,
 		})

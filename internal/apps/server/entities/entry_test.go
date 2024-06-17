@@ -212,3 +212,104 @@ func TestUpdateVersion_versionConflict(t *testing.T) {
 	errs := entry.Update(entry.Version-1, entities.UpdateEntryData([]byte("test1")))
 	require.ErrorIs(t, errs, entities.ErrEntryVersionConflict, "want version conflict error")
 }
+
+func Test_Validate(t *testing.T) {
+	type validator interface {
+		Validate() error
+	}
+	largeData := []byte(strings.Repeat("s", entities.EntryMaxDataSize+1))
+
+	tests := []struct {
+		name     string
+		v        validator
+		wantErrs []error
+	}{
+		{
+			name: "GetEntriesRequest",
+			v:    &entities.GetEntriesRequest{UserID: uuid.Nil},
+			wantErrs: []error{
+				entities.ErrUserIDInvalid,
+			},
+		},
+		{
+			name: "GetEntriesDiffRequest",
+			v:    &entities.GetEntriesDiffRequest{UserID: uuid.Nil, Versions: nil},
+			wantErrs: []error{
+				entities.ErrUserIDInvalid,
+			},
+		},
+		{
+			name: "GetEntryRequest",
+			v:    &entities.GetEntryRequest{ID: uuid.Nil, UserID: uuid.Nil},
+			wantErrs: []error{
+				entities.ErrEntryIDInvalid,
+				entities.ErrUserIDInvalid,
+			},
+		},
+		{
+			name: "CreateEntryRequest",
+			v: &entities.CreateEntryRequest{
+				Key:    "",
+				Type:   "",
+				UserID: uuid.Nil,
+				Meta:   nil,
+				Data:   nil,
+			},
+			wantErrs: []error{
+				entities.ErrEntryKeyInvalid,
+				entities.ErrEntryTypeInvalid,
+				entities.ErrUserIDInvalid,
+				entities.ErrEntryDataEmpty,
+			},
+		}, {
+			name: "CreateEntryRequest",
+			v: &entities.CreateEntryRequest{
+				Key:    "",
+				Type:   "",
+				UserID: uuid.Nil,
+				Meta:   nil,
+				Data:   largeData,
+			},
+			wantErrs: []error{
+				entities.ErrEntryKeyInvalid,
+				entities.ErrEntryTypeInvalid,
+				entities.ErrUserIDInvalid,
+				entities.ErrEntryDataSizeExceeded,
+			},
+		}, {
+			name: "UpdateEntryRequest",
+			v: &entities.UpdateEntryRequest{
+				ID:      uuid.Nil,
+				UserID:  uuid.Nil,
+				Meta:    nil,
+				Data:    largeData,
+				Version: 0,
+			},
+			wantErrs: []error{
+				entities.ErrUserIDInvalid,
+				entities.ErrEntryIDInvalid,
+				entities.ErrEntryDataSizeExceeded,
+				entities.ErrEntryVersionInvalid,
+			},
+		}, {
+			name: "DeleteEntryRequest",
+			v: &entities.DeleteEntryRequest{
+				ID:     uuid.Nil,
+				UserID: uuid.Nil,
+			},
+			wantErrs: []error{
+				entities.ErrUserIDInvalid,
+				entities.ErrEntryIDInvalid,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.v.Validate()
+			for _, wantErr := range tt.wantErrs {
+				require.ErrorIs(t, err, wantErr, "error mismatch")
+			}
+		})
+	}
+}

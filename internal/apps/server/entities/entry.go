@@ -1,9 +1,9 @@
 package entities
 
 import (
+	"errors"
 	"fmt"
 	"github.com/dlomanov/gophkeeper/internal/core"
-	"go.uber.org/multierr"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,16 +36,16 @@ func NewEntry(
 ) (*Entry, error) {
 	var err error
 	if key == "" {
-		err = multierr.Append(err, fmt.Errorf("%w: %s", ErrEntryKeyInvalid, key))
+		err = errors.Join(err, fmt.Errorf("%w: %s", ErrEntryKeyInvalid, key))
 	}
 	if userID == uuid.Nil {
-		err = multierr.Append(err, fmt.Errorf("%w: %s", ErrUserIDInvalid, userID))
+		err = errors.Join(err, fmt.Errorf("%w: %s", ErrUserIDInvalid, userID))
 	}
 	if !typ.Valid() {
-		err = multierr.Append(err, fmt.Errorf("%w: %s", ErrEntryTypeInvalid, typ))
+		err = errors.Join(err, fmt.Errorf("%w: %s", ErrEntryTypeInvalid, typ))
 	}
 	if data == nil {
-		err = multierr.Append(err, fmt.Errorf("%w: data empty", ErrEntryDataEmpty))
+		err = errors.Join(err, fmt.Errorf("%w: data empty", ErrEntryDataEmpty))
 	}
 	if len(data) > EntryMaxDataSize {
 		err = fmt.Errorf("%w: data size exceeded: %d", ErrEntryDataSizeExceeded, len(data))
@@ -78,7 +78,7 @@ func (e *Entry) Update(version int64, opts ...EntryUpdateOption) error {
 
 	var err error
 	for _, opt := range opts {
-		err = multierr.Append(err, opt(e))
+		err = errors.Join(err, opt(e))
 	}
 	if err != nil {
 		return fmt.Errorf("entry: failed to update: %w", err)
@@ -106,4 +106,136 @@ func UpdateEntryMeta(meta map[string]string) EntryUpdateOption {
 		e.Meta = meta
 		return nil
 	}
+}
+
+type (
+	GetEntryRequest struct {
+		UserID uuid.UUID
+		ID     uuid.UUID
+	}
+	GetEntriesDiffRequest struct {
+		UserID   uuid.UUID
+		Versions []core.EntryVersion
+	}
+	GetEntriesDiffResponse struct {
+		Entries   []Entry
+		CreateIDs []uuid.UUID
+		UpdateIDs []uuid.UUID
+		DeleteIDs []uuid.UUID
+	}
+	GetEntryResponse struct {
+		Entry *Entry
+	}
+	GetEntriesRequest struct {
+		UserID uuid.UUID
+	}
+	GetEntriesResponse struct {
+		Entries []Entry
+	}
+	CreateEntryRequest struct {
+		Key    string
+		UserID uuid.UUID
+		Type   core.EntryType
+		Meta   map[string]string
+		Data   []byte
+	}
+	CreateEntryResponse struct {
+		ID      uuid.UUID
+		Version int64
+	}
+	UpdateEntryRequest struct {
+		ID      uuid.UUID
+		UserID  uuid.UUID
+		Meta    map[string]string
+		Data    []byte
+		Version int64
+	}
+	UpdateEntryResponse struct {
+		ID      uuid.UUID
+		Version int64
+	}
+	DeleteEntryRequest struct {
+		ID     uuid.UUID
+		UserID uuid.UUID
+	}
+	DeleteEntryResponse struct {
+		ID      uuid.UUID
+		Version int64
+	}
+)
+
+func (r GetEntryRequest) Validate() error {
+	var err error
+	if r.UserID == uuid.Nil {
+		err = errors.Join(err, ErrUserIDInvalid)
+	}
+	if r.ID == uuid.Nil {
+		err = errors.Join(err, ErrEntryIDInvalid)
+	}
+	return err
+}
+
+func (r GetEntriesRequest) Validate() error {
+	if r.UserID == uuid.Nil {
+		return ErrUserIDInvalid
+	}
+	return nil
+}
+
+func (r GetEntriesDiffRequest) Validate() error {
+	if r.UserID == uuid.Nil {
+		return ErrUserIDInvalid
+	}
+	return nil
+}
+
+func (r CreateEntryRequest) Validate() error {
+	var err error
+	if r.Key == "" {
+		err = errors.Join(err, ErrEntryKeyInvalid)
+	}
+	if r.UserID == uuid.Nil {
+		err = errors.Join(err, ErrUserIDInvalid)
+	}
+	if !r.Type.Valid() {
+		err = errors.Join(err, ErrEntryTypeInvalid)
+	}
+	if len(r.Data) == 0 {
+		err = errors.Join(err, ErrEntryDataEmpty)
+	}
+	if len(r.Data) > EntryMaxDataSize {
+		err = errors.Join(err, ErrEntryDataSizeExceeded)
+	}
+	return err
+}
+
+func (r UpdateEntryRequest) Validate() error {
+	var err error
+	if r.UserID == uuid.Nil {
+		err = errors.Join(err, ErrUserIDInvalid)
+	}
+	if r.ID == uuid.Nil {
+		err = errors.Join(err, ErrEntryIDInvalid)
+	}
+	if len(r.Data) == 0 {
+		err = errors.Join(err, ErrEntryDataEmpty)
+	}
+	if len(r.Data) > EntryMaxDataSize {
+		err = errors.Join(err, ErrEntryDataSizeExceeded)
+	}
+	if r.Version == 0 {
+		err = errors.Join(err, ErrEntryVersionInvalid)
+	}
+	return err
+}
+
+func (r DeleteEntryRequest) Validate() error {
+	var err error
+	if r.UserID == uuid.Nil {
+		err = errors.Join(err, ErrUserIDInvalid)
+	}
+	if r.ID == uuid.Nil {
+		err = errors.Join(err, ErrEntryIDInvalid)
+	}
+	return err
 }

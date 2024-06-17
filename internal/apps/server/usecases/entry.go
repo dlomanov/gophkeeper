@@ -8,7 +8,6 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entities"
 	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
-	"go.uber.org/multierr"
 	"go.uber.org/zap"
 )
 
@@ -45,59 +44,6 @@ type (
 		Encrypt(data []byte) ([]byte, error)
 		Decrypt(data []byte) ([]byte, error)
 	}
-	GetEntryRequest struct {
-		UserID uuid.UUID
-		ID     uuid.UUID
-	}
-	GetEntriesDiffRequest struct {
-		UserID   uuid.UUID
-		Versions []core.EntryVersion
-	}
-	GetEntriesDiffResponse struct {
-		Entries   []entities.Entry
-		CreateIDs []uuid.UUID
-		UpdateIDs []uuid.UUID
-		DeleteIDs []uuid.UUID
-	}
-	GetEntryResponse struct {
-		Entry *entities.Entry
-	}
-	GetEntriesRequest struct {
-		UserID uuid.UUID
-	}
-	GetEntriesResponse struct {
-		Entries []entities.Entry
-	}
-	CreateEntryRequest struct {
-		Key    string
-		UserID uuid.UUID
-		Type   core.EntryType
-		Meta   map[string]string
-		Data   []byte
-	}
-	CreateEntryResponse struct {
-		ID      uuid.UUID
-		Version int64
-	}
-	UpdateEntryRequest struct {
-		ID      uuid.UUID
-		UserID  uuid.UUID
-		Meta    map[string]string
-		Data    []byte
-		Version int64
-	}
-	UpdateEntryResponse struct {
-		ID      uuid.UUID
-		Version int64
-	}
-	DeleteEntryRequest struct {
-		ID     uuid.UUID
-		UserID uuid.UUID
-	}
-	DeleteEntryResponse struct {
-		ID      uuid.UUID
-		Version int64
-	}
 )
 
 func NewEntryUC(
@@ -118,9 +64,9 @@ func NewEntryUC(
 
 func (uc *EntryUC) Get(
 	ctx context.Context,
-	request GetEntryRequest,
-) (response GetEntryResponse, err error) {
-	if err := request.validate(); err != nil {
+	request entities.GetEntryRequest,
+) (response entities.GetEntryResponse, err error) {
+	if err := request.Validate(); err != nil {
 		return response, fmt.Errorf("get entry: invalid request: %w", err)
 	}
 	userID := request.UserID
@@ -157,9 +103,9 @@ func (uc *EntryUC) Get(
 
 func (uc *EntryUC) GetEntries(
 	ctx context.Context,
-	request GetEntriesRequest,
-) (response GetEntriesResponse, err error) {
-	if err = request.validate(); err != nil {
+	request entities.GetEntriesRequest,
+) (response entities.GetEntriesResponse, err error) {
+	if err = request.Validate(); err != nil {
 		return response, fmt.Errorf("get all entries: invalid request: %w", err)
 	}
 	userID := request.UserID
@@ -188,9 +134,9 @@ func (uc *EntryUC) GetEntries(
 
 func (uc *EntryUC) GetEntriesDiff(
 	ctx context.Context,
-	request GetEntriesDiffRequest,
-) (response GetEntriesDiffResponse, err error) {
-	if err := request.validate(); err != nil {
+	request entities.GetEntriesDiffRequest,
+) (response entities.GetEntriesDiffResponse, err error) {
+	if err := request.Validate(); err != nil {
 		return response, fmt.Errorf("get all entries: invalid request: %w", err)
 	}
 	var (
@@ -243,10 +189,10 @@ func (uc *EntryUC) GetEntriesDiff(
 
 func (uc *EntryUC) Create(
 	ctx context.Context,
-	request CreateEntryRequest,
-) (resp CreateEntryResponse, err error) {
-	if err = request.validate(); err != nil {
-		return resp, fmt.Errorf("create entry: invalid request: %w", err)
+	request entities.CreateEntryRequest,
+) (response entities.CreateEntryResponse, err error) {
+	if err = request.Validate(); err != nil {
+		return response, fmt.Errorf("create entry: invalid request: %w", err)
 	}
 	userID := request.UserID
 
@@ -255,11 +201,11 @@ func (uc *EntryUC) Create(
 		uc.logger.Error("failed to encrypt entry",
 			zap.String("user_id", userID.String()),
 			zap.Error(err))
-		return resp, fmt.Errorf("create_entry: failed to encrypt entry: %w", err)
+		return response, fmt.Errorf("create_entry: failed to encrypt entry: %w", err)
 	}
 	entry, err := entities.NewEntry(request.Key, userID, request.Type, encrypted)
 	if err != nil {
-		return resp, fmt.Errorf("create_entry: failed to create_entry: %w", err)
+		return response, fmt.Errorf("create_entry: failed to create_entry: %w", err)
 	}
 	entry.Meta = request.Meta
 	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
@@ -285,20 +231,20 @@ func (uc *EntryUC) Create(
 			zap.String("user_id", userID.String()),
 			zap.String("key", request.Key),
 			zap.Error(err))
-		return resp, err
+		return response, err
 	}
-	resp.ID = entry.ID
-	resp.Version = entry.Version
+	response.ID = entry.ID
+	response.Version = entry.Version
 
-	return resp, nil
+	return response, nil
 }
 
 func (uc *EntryUC) Update(
 	ctx context.Context,
-	request UpdateEntryRequest,
-) (resp UpdateEntryResponse, err error) {
-	if err = request.validate(); err != nil {
-		return resp, fmt.Errorf("update entry: invalid request: %w", err)
+	request entities.UpdateEntryRequest,
+) (response entities.UpdateEntryResponse, err error) {
+	if err = request.Validate(); err != nil {
+		return response, fmt.Errorf("update entry: invalid request: %w", err)
 	}
 	userID := request.UserID
 	id := request.ID
@@ -309,7 +255,7 @@ func (uc *EntryUC) Update(
 		uc.logger.Error("failed to encrypt entry",
 			zap.String("user_id", userID.String()),
 			zap.Error(err))
-		return resp, fmt.Errorf("update_entry: failed to encrypt entry: %w", err)
+		return response, fmt.Errorf("update_entry: failed to encrypt entry: %w", err)
 	}
 	var entry *entities.Entry
 	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
@@ -353,20 +299,20 @@ func (uc *EntryUC) Update(
 			zap.String("user_id", userID.String()),
 			zap.String("entry_id", id.String()),
 			zap.Error(err))
-		return resp, err
+		return response, err
 	}
-	resp.ID = entry.ID
-	resp.Version = entry.Version
+	response.ID = entry.ID
+	response.Version = entry.Version
 
-	return resp, nil
+	return response, nil
 }
 
 func (uc *EntryUC) Delete(
 	ctx context.Context,
-	request DeleteEntryRequest,
-) (resp DeleteEntryResponse, err error) {
-	if err = request.validate(); err != nil {
-		return resp, fmt.Errorf("delete entry: invalid request: %w", err)
+	request entities.DeleteEntryRequest,
+) (response entities.DeleteEntryResponse, err error) {
+	if err = request.Validate(); err != nil {
+		return response, fmt.Errorf("delete entry: invalid request: %w", err)
 	}
 	userID := request.UserID
 	id := request.ID
@@ -394,90 +340,14 @@ func (uc *EntryUC) Delete(
 			zap.String("user_id", userID.String()),
 			zap.String("entry_id", id.String()),
 			zap.Error(err))
-		return resp, err
+		return response, err
 	}
-	resp.ID = entry.ID
-	resp.Version = entry.Version
+	response.ID = entry.ID
+	response.Version = entry.Version
 
-	return resp, nil
+	return response, nil
 }
 
 func (uc *EntryUC) newConflictKey(key string, version int64) string {
 	return fmt.Sprintf("%s_conflict_%d_%s", key, version, uuid.New().String())
-}
-
-func (r GetEntryRequest) validate() error {
-	var err error
-	if r.UserID == uuid.Nil {
-		err = multierr.Append(err, entities.ErrUserIDInvalid)
-	}
-	if r.ID == uuid.Nil {
-		err = multierr.Append(err, entities.ErrEntryIDInvalid)
-	}
-	return err
-}
-
-func (r GetEntriesRequest) validate() error {
-	if r.UserID == uuid.Nil {
-		return entities.ErrUserIDInvalid
-	}
-	return nil
-}
-
-func (r GetEntriesDiffRequest) validate() error {
-	if r.UserID == uuid.Nil {
-		return entities.ErrUserIDInvalid
-	}
-	return nil
-}
-
-func (r CreateEntryRequest) validate() error {
-	var err error
-	if r.Key == "" {
-		err = multierr.Append(err, entities.ErrEntryKeyInvalid)
-	}
-	if r.UserID == uuid.Nil {
-		err = multierr.Append(err, entities.ErrUserIDInvalid)
-	}
-	if !r.Type.Valid() {
-		err = multierr.Append(err, entities.ErrEntryTypeInvalid)
-	}
-	if len(r.Data) == 0 {
-		err = multierr.Append(err, entities.ErrEntryDataEmpty)
-	}
-	if len(r.Data) > entities.EntryMaxDataSize {
-		err = multierr.Append(err, entities.ErrEntryDataSizeExceeded)
-	}
-	return err
-}
-
-func (r UpdateEntryRequest) validate() error {
-	var err error
-	if r.UserID == uuid.Nil {
-		err = multierr.Append(err, entities.ErrUserIDInvalid)
-	}
-	if r.ID == uuid.Nil {
-		err = multierr.Append(err, entities.ErrEntryIDInvalid)
-	}
-	if len(r.Data) == 0 {
-		err = multierr.Append(err, entities.ErrEntryDataEmpty)
-	}
-	if len(r.Data) > entities.EntryMaxDataSize {
-		err = multierr.Append(err, entities.ErrEntryDataSizeExceeded)
-	}
-	if r.Version == 0 {
-		err = multierr.Append(err, entities.ErrEntryVersionInvalid)
-	}
-	return err
-}
-
-func (r DeleteEntryRequest) validate() error {
-	var err error
-	if r.UserID == uuid.Nil {
-		err = multierr.Append(err, entities.ErrUserIDInvalid)
-	}
-	if r.ID == uuid.Nil {
-		err = multierr.Append(err, entities.ErrEntryIDInvalid)
-	}
-	return err
 }

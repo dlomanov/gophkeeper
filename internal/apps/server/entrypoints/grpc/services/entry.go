@@ -51,7 +51,7 @@ func (s *EntryService) Get(
 		return nil, status.Error(codes.InvalidArgument, entities.ErrEntryIDInvalid.Error())
 	}
 
-	got, err := s.entryUC.Get(ctx, usecases.GetEntryRequest{UserID: userID, ID: id})
+	got, err := s.entryUC.Get(ctx, entities.GetEntryRequest{UserID: userID, ID: id})
 	var (
 		invalid  *apperrors.AppErrorInvalid
 		notFound *apperrors.AppErrorNotFound
@@ -82,7 +82,7 @@ func (s *EntryService) GetAll(
 		return nil, status.Error(codes.Unauthenticated, entities.ErrUserIDInvalid.Error())
 	}
 
-	got, err := s.entryUC.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID})
+	got, err := s.entryUC.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID})
 	var (
 		invalid *apperrors.AppErrorInvalid
 	)
@@ -114,7 +114,7 @@ func (s *EntryService) GetDiff(
 	}
 
 	versions := s.toEntityVersions(request.Versions)
-	got, err := s.entryUC.GetEntriesDiff(ctx, usecases.GetEntriesDiffRequest{
+	got, err := s.entryUC.GetEntriesDiff(ctx, entities.GetEntriesDiffRequest{
 		UserID:   userID,
 		Versions: versions,
 	})
@@ -162,7 +162,7 @@ func (s *EntryService) Create(
 		return nil, status.Error(codes.Unauthenticated, entities.ErrUserIDInvalid.Error())
 	}
 
-	created, err := s.entryUC.Create(ctx, usecases.CreateEntryRequest{
+	created, err := s.entryUC.Create(ctx, entities.CreateEntryRequest{
 		Key:    request.Key,
 		UserID: userID,
 		Type:   s.toEntityType(request.Type),
@@ -201,7 +201,7 @@ func (s *EntryService) Update(
 		return nil, status.Error(codes.Unauthenticated, entities.ErrUserIDInvalid.Error())
 	}
 
-	updated, err := s.entryUC.Update(ctx, usecases.UpdateEntryRequest{
+	updated, err := s.entryUC.Update(ctx, entities.UpdateEntryRequest{
 		ID:      s.parseUUID(request.Id),
 		UserID:  userID,
 		Meta:    request.Meta,
@@ -241,7 +241,7 @@ func (s *EntryService) Delete(
 		return nil, status.Error(codes.Unauthenticated, entities.ErrUserIDInvalid.Error())
 	}
 
-	deleted, err := s.entryUC.Delete(ctx, usecases.DeleteEntryRequest{
+	deleted, err := s.entryUC.Delete(ctx, entities.DeleteEntryRequest{
 		ID:     s.parseUUID(request.Id),
 		UserID: userID,
 	})

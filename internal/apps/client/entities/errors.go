@@ -12,6 +12,8 @@ var (
 	ErrEntryNotFound         = apperrors.NewNotFound("entry not found")
 	ErrUserExists            = apperrors.NewInvalid("user already exists")
 	ErrUserCredsInvalid      = apperrors.NewInvalid("user credentials are invalid")
+	ErrUserLoginInvalid      = apperrors.NewInvalid("user login is invalid")
+	ErrUserPasswordInvalid   = apperrors.NewInvalid("user password is invalid")
 	ErrUserTokenNotFound     = apperrors.NewNotFound("token not found")
 	ErrUserTokenInvalid      = apperrors.NewInvalid("token is invalid")
 	ErrUserMasterPassInvalid = apperrors.NewInvalid("master password is invalid")

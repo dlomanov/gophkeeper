@@ -7,9 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
-	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
 	"github.com/google/uuid"
-	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"slices"
 	"strings"
@@ -33,8 +31,8 @@ type (
 		EntryCreateUC
 		EntryUpdateUC
 		Sync(ctx context.Context) error
-		GetAll(ctx context.Context) (usecases.GetEntriesResponse, error)
-		Delete(ctx context.Context, request usecases.DeleteEntryRequest) error
+		GetAll(ctx context.Context) (entities.GetEntriesResponse, error)
+		Delete(ctx context.Context, request entities.DeleteEntryRequest) error
 	}
 	syncMsg struct {
 		entries []entities.Entry
@@ -242,7 +240,7 @@ func (c *EntryTable) deleteCmd(id uuid.UUID) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		err := c.entryUC.Delete(ctx, usecases.DeleteEntryRequest{ID: id})
+		err := c.entryUC.Delete(ctx, entities.DeleteEntryRequest{ID: id})
 		return deleteMsg{err: err}
 	}
 }
@@ -254,11 +252,11 @@ func (c *EntryTable) syncCmd() tea.Cmd {
 		var merr error
 		if err := c.entryUC.Sync(ctx); err != nil {
 			c.logger.Error("failed to sync entries", zap.Error(err))
-			merr = multierr.Append(merr, err)
+			merr = errors.Join(merr, err)
 		}
 		resp, err := c.entryUC.GetAll(ctx)
 		if err != nil {
-			merr = multierr.Append(merr, err)
+			merr = errors.Join(merr, err)
 			return syncMsg{err: merr}
 		}
 		return syncMsg{entries: resp.Entries, err: merr}

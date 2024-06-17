@@ -20,7 +20,6 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/infra/encrypto"
 	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
 	"github.com/jmoiron/sqlx"
-	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -132,13 +131,13 @@ func (c *Container) Close() (merr error) {
 	defer cancel()
 
 	if err := c.Conn.Close(); err != nil {
-		merr = multierr.Append(merr, fmt.Errorf("container: failed to close GRPC-connection: %w", err))
+		merr = errors.Join(merr, fmt.Errorf("container: failed to close GRPC-connection: %w", err))
 	}
 	if err := c.Memstorage.Flush(timeoutCtx, c.Memcache); err != nil {
-		merr = multierr.Append(merr, fmt.Errorf("container: failed to flush memcache: %w", err))
+		merr = errors.Join(merr, fmt.Errorf("container: failed to flush memcache: %w", err))
 	}
 	if err := c.DB.Close(); err != nil {
-		merr = multierr.Append(merr, fmt.Errorf("container: failed to close database: %w", err))
+		merr = errors.Join(merr, fmt.Errorf("container: failed to close database: %w", err))
 	}
 
 	return merr

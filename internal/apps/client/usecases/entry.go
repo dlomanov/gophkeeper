@@ -30,27 +30,6 @@ type (
 		mapper        mapper.EntryMapper
 		tx            trm.Manager
 	}
-	GetEntriesResponse struct {
-		Entries []entities.Entry
-	}
-	CreateEntryRequest struct {
-		Key  string
-		Type core.EntryType
-		Meta map[string]string
-		Data []byte
-	}
-	CreateEntryResponse struct {
-		ID uuid.UUID
-	}
-	UpdateEntryRequest struct {
-		ID      uuid.UUID ``
-		Meta    map[string]string
-		Data    []byte
-		Version int64
-	}
-	DeleteEntryRequest struct {
-		ID uuid.UUID
-	}
 	EntryRepo interface {
 		Get(ctx context.Context, id uuid.UUID) (entities.Entry, error)
 		GetAll(ctx context.Context) ([]entities.Entry, error)
@@ -91,7 +70,7 @@ func NewEntriesUC(
 	}
 }
 
-func (uc *EntryUC) GetAll(ctx context.Context) (response GetEntriesResponse, err error) {
+func (uc *EntryUC) GetAll(ctx context.Context) (response entities.GetEntriesResponse, err error) {
 	entries, err := uc.entryRepo.GetAll(ctx)
 	if err != nil {
 		return response, fmt.Errorf("entry_usecase: failed to get entries: %w", err)
@@ -109,8 +88,8 @@ func (uc *EntryUC) GetAll(ctx context.Context) (response GetEntriesResponse, err
 
 func (uc *EntryUC) Create(
 	ctx context.Context,
-	request CreateEntryRequest,
-) (response CreateEntryResponse, err error) {
+	request entities.CreateEntryRequest,
+) (response entities.CreateEntryResponse, err error) {
 	var data []byte
 	if data, err = uc.encrypter.Encrypt(request.Data); err != nil {
 		uc.logger.Error("failed to encrypt entry data", zap.Error(err))
@@ -144,7 +123,7 @@ func (uc *EntryUC) Create(
 
 func (uc *EntryUC) Update(
 	ctx context.Context,
-	request UpdateEntryRequest,
+	request entities.UpdateEntryRequest,
 ) (err error) {
 	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
 		entry, err := uc.entryRepo.Get(ctx, request.ID)
@@ -182,7 +161,7 @@ func (uc *EntryUC) Update(
 
 func (uc *EntryUC) Delete(
 	ctx context.Context,
-	request DeleteEntryRequest,
+	request entities.DeleteEntryRequest,
 ) (err error) {
 	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
 		if err = uc.entryRepo.Delete(ctx, request.ID); err != nil {

@@ -17,14 +17,6 @@ type (
 		cache      *mem.Cache
 		userClient pb.UserServiceClient
 	}
-	SignUpUserRequest struct {
-		Login    string
-		Password string
-	}
-	SignInUserRequest struct {
-		Login    string
-		Password string
-	}
 )
 
 func NewUserUC(
@@ -41,7 +33,7 @@ func NewUserUC(
 
 func (uc *UserUC) SignUp(
 	ctx context.Context,
-	request SignUpUserRequest,
+	request entities.SignUpUserRequest,
 ) error {
 	resp, err := uc.userClient.SignUp(ctx, &pb.SignUpUserRequest{
 		Login:    request.Login,
@@ -62,7 +54,7 @@ func (uc *UserUC) SignUp(
 
 func (uc *UserUC) SignIn(
 	ctx context.Context,
-	request SignInUserRequest,
+	request entities.SignInUserRequest,
 ) (err error) {
 	resp, err := uc.userClient.SignIn(ctx, &pb.SignInUserRequest{
 		Login:    request.Login,

@@ -34,7 +34,7 @@ func TestEntryUC(t *testing.T) {
 	userID2 := uuid.New()
 
 	// GetEntries (empty)
-	getAll, err := sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
+	getAll, err := sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	require.Empty(t, getAll.Entries, "expected empty list")
 
@@ -47,7 +47,7 @@ func TestEntryUC(t *testing.T) {
 	entries[2], err = entities.NewEntry("key3", userID1, core.EntryTypeNote, []byte("test_data_3"))
 	require.NoError(t, err, "no error expected")
 	for i, entry := range entries {
-		created, err := sut.Create(ctx, usecases.CreateEntryRequest{
+		created, err := sut.Create(ctx, entities.CreateEntryRequest{
 			Key:    entry.Key,
 			UserID: entry.UserID,
 			Type:   entry.Type,
@@ -61,7 +61,7 @@ func TestEntryUC(t *testing.T) {
 		entries[i].Version = created.Version
 		time.Sleep(time.Millisecond) // for sorting purposes
 	}
-	created, err := sut.Create(ctx, usecases.CreateEntryRequest{
+	created, err := sut.Create(ctx, entities.CreateEntryRequest{
 		Key:    entries[0].Key,
 		UserID: userID1,
 		Type:   core.EntryTypeNote,
@@ -70,7 +70,7 @@ func TestEntryUC(t *testing.T) {
 	})
 	require.NoError(t, err, "no error expected")
 	require.NotEqual(t, entries[0].ID, created.ID, "expected different IDs")
-	got, err := sut.Get(ctx, usecases.GetEntryRequest{
+	got, err := sut.Get(ctx, entities.GetEntryRequest{
 		ID:     created.ID,
 		UserID: userID1,
 	})
@@ -85,13 +85,13 @@ func TestEntryUC(t *testing.T) {
 	require.Equal(t, got.Entry.Version, entries[0].Version, "expected same entry versions")
 	require.NotEmpty(t, got.Entry.CreatedAt, "expected non-empty created at")
 	require.NotEmpty(t, got.Entry.UpdatedAt, "expected non-empty created at")
-	_, err = sut.Delete(ctx, usecases.DeleteEntryRequest{
+	_, err = sut.Delete(ctx, entities.DeleteEntryRequest{
 		ID:     created.ID,
 		UserID: userID1,
 	})
 	require.NoError(t, err, "no error expected")
 
-	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
+	getAll, err = sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
 	for i, entry := range getAll.Entries {
@@ -108,17 +108,17 @@ func TestEntryUC(t *testing.T) {
 	}
 
 	// Delete + GetEntries
-	_, err = sut.Delete(ctx, usecases.DeleteEntryRequest{
+	_, err = sut.Delete(ctx, entities.DeleteEntryRequest{
 		ID:     uuid.New(),
 		UserID: userID2,
 	})
 	require.ErrorIs(t, err, entities.ErrEntryNotFound, "expected entry not found error")
-	_, err = sut.Delete(ctx, usecases.DeleteEntryRequest{
+	_, err = sut.Delete(ctx, entities.DeleteEntryRequest{
 		ID:     entries[0].ID,
 		UserID: userID2,
 	})
 	require.ErrorIs(t, err, entities.ErrEntryNotFound, "expected entry not found error")
-	del, err := sut.Delete(ctx, usecases.DeleteEntryRequest{
+	del, err := sut.Delete(ctx, entities.DeleteEntryRequest{
 		ID:     entries[0].ID,
 		UserID: userID1,
 	})
@@ -126,7 +126,7 @@ func TestEntryUC(t *testing.T) {
 	assert.Equal(t, del.ID.String(), getAll.Entries[0].ID.String(), "expected same entry IDs")
 	assert.Equal(t, del.Version, getAll.Entries[0].Version, "expected same entry versions")
 	entries = entries[1:]
-	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
+	getAll, err = sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
 	for i, entry := range getAll.Entries {
@@ -143,7 +143,7 @@ func TestEntryUC(t *testing.T) {
 	// Update + Get
 	entries[0].Meta = map[string]string{"updated_test_key": "updated_test_value"}
 	entries[0].Data = []byte("updated_test_data")
-	updateRequest := usecases.UpdateEntryRequest{
+	updateRequest := entities.UpdateEntryRequest{
 		ID:      entries[0].ID,
 		UserID:  userID1,
 		Version: entries[0].Version,
@@ -154,7 +154,7 @@ func TestEntryUC(t *testing.T) {
 	require.NoError(t, err, "no error expected")
 	assert.Equal(t, entries[0].Version+1, updated.Version, "expected updated version")
 	entries[0].Version = updated.Version
-	get, err := sut.Get(ctx, usecases.GetEntryRequest{ID: entries[0].ID, UserID: userID1})
+	get, err := sut.Get(ctx, entities.GetEntryRequest{ID: entries[0].ID, UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	assert.Equal(t, get.Entry.ID.String(), updated.ID.String(), "expected same entry")
 	assert.Equal(t, get.Entry.Key, getAll.Entries[0].Key, "expected same entry keys")
@@ -168,7 +168,7 @@ func TestEntryUC(t *testing.T) {
 	updateEntry := *entries[0]
 	updateEntry.Meta = map[string]string{"updated_test_key_1": "updated_test_value_1"}
 	updateEntry.Data = []byte("updated_test_data_1")
-	updateRequest = usecases.UpdateEntryRequest{
+	updateRequest = entities.UpdateEntryRequest{
 		ID:      updateEntry.ID,
 		UserID:  userID1,
 		Version: updateEntry.Version + 10,
@@ -179,7 +179,7 @@ func TestEntryUC(t *testing.T) {
 	require.NoError(t, err, "no error expected")
 	assert.Equal(t, int64(1), conflict.Version, "expected conflict version == 1")
 	assert.NotEqual(t, conflict.ID.String(), updateEntry.ID.String(), "expected conflict ID != entry ID")
-	get, err = sut.Get(ctx, usecases.GetEntryRequest{ID: conflict.ID, UserID: userID1})
+	get, err = sut.Get(ctx, entities.GetEntryRequest{ID: conflict.ID, UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	assert.Equal(t, get.Entry.ID.String(), conflict.ID.String(), "expected same entry")
 	assert.NotEqual(t, get.Entry.Key, updateEntry.Key, "expected conflict key != entry key")
@@ -189,7 +189,7 @@ func TestEntryUC(t *testing.T) {
 	assert.True(t, reflect.DeepEqual(get.Entry.Meta, updateEntry.Meta), "expected same entry meta")
 	assert.Equal(t, get.Entry.Data, updateEntry.Data, "expected same entry data")
 	assert.Equal(t, get.Entry.Version, conflict.Version, "expected same entry version")
-	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
+	getAll, err = sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
 	conflictIndex := slices.IndexFunc(getAll.Entries, func(e entities.Entry) bool { return e.ID == conflict.ID })
@@ -198,7 +198,7 @@ func TestEntryUC(t *testing.T) {
 	require.GreaterOrEqual(t, originIndex, 0, "expected origin entry in list")
 
 	// GetEntriesDiff
-	getAll, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: userID1})
+	getAll, err = sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
 	require.NoError(t, err, "no error expected")
 	versions := make([]core.EntryVersion, len(getAll.Entries))
 	for i, v := range getAll.Entries {
@@ -206,7 +206,7 @@ func TestEntryUC(t *testing.T) {
 	}
 	versions[len(versions)-1] = core.EntryVersion{ID: uuid.New(), Version: 1} // server does not have this entry
 	versions[0].Version = versions[0].Version + 10
-	getDiff, err := sut.GetEntriesDiff(ctx, usecases.GetEntriesDiffRequest{UserID: userID1, Versions: versions})
+	getDiff, err := sut.GetEntriesDiff(ctx, entities.GetEntriesDiffRequest{UserID: userID1, Versions: versions})
 	require.NoError(t, err, "no error expected")
 	require.Len(t, getDiff.Entries, 2, "expected non-empty list")
 	require.Len(t, getDiff.CreateIDs, 1, "expected non-empty list")
@@ -217,67 +217,4 @@ func TestEntryUC(t *testing.T) {
 	require.Equal(t, getDiff.UpdateIDs[0], versions[0].ID, "expected same entry")
 	require.True(t, slices.ContainsFunc(getDiff.Entries, func(entry entities.Entry) bool { return entry.ID == getDiff.UpdateIDs[0] }), "expected entry in list")
 	require.True(t, slices.ContainsFunc(getDiff.Entries, func(entry entities.Entry) bool { return entry.ID == getDiff.CreateIDs[0] }), "expected entry in list")
-}
-
-func TestEntryUC_validation(t *testing.T) {
-	ctx := context.Background()
-	enc, err := encrypto.NewEncrypter([]byte("1234567890123456"))
-	merger := diff.NewEntry()
-	require.NoError(t, err, "no error expected")
-	sut := usecases.NewEntryUC(
-		zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel)),
-		NewMockEntryRepo(),
-		merger,
-		enc,
-		NewMockTrmManager())
-
-	largeData := []byte(strings.Repeat("s", entities.EntryMaxDataSize+1))
-
-	_, err = sut.GetEntries(ctx, usecases.GetEntriesRequest{UserID: uuid.Nil})
-	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
-
-	_, err = sut.GetEntriesDiff(ctx, usecases.GetEntriesDiffRequest{UserID: uuid.Nil, Versions: nil})
-	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
-
-	_, err = sut.Get(ctx, usecases.GetEntryRequest{ID: uuid.Nil, UserID: uuid.Nil})
-	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryIDInvalid, "expected entry ID invalid error")
-
-	_, err = sut.Create(ctx, usecases.CreateEntryRequest{
-		Key:    "",
-		Type:   "",
-		UserID: uuid.Nil,
-		Meta:   nil,
-		Data:   nil,
-	})
-	require.ErrorIs(t, err, entities.ErrEntryKeyInvalid, "expected entry key invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryTypeInvalid, "expected entry type invalid error")
-	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryDataEmpty, "expected entry data empty error")
-	_, err = sut.Create(ctx, usecases.CreateEntryRequest{
-		Key:    "",
-		Type:   "",
-		UserID: uuid.Nil,
-		Meta:   nil,
-		Data:   largeData,
-	})
-	require.ErrorIs(t, err, entities.ErrEntryKeyInvalid, "expected entry key invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryTypeInvalid, "expected entry type invalid error")
-	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryDataSizeExceeded, "expected entry data size exceeded error")
-
-	_, err = sut.Update(ctx, usecases.UpdateEntryRequest{ID: uuid.Nil, UserID: uuid.Nil, Meta: nil, Data: nil, Version: 0})
-	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryIDInvalid, "expected entry ID invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryDataEmpty, "expected entry data empty error")
-	require.ErrorIs(t, err, entities.ErrEntryVersionInvalid, "expected entry version invalid error")
-	_, err = sut.Update(ctx, usecases.UpdateEntryRequest{ID: uuid.Nil, UserID: uuid.Nil, Meta: nil, Data: largeData, Version: 0})
-	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryIDInvalid, "expected entry ID invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryDataSizeExceeded, "expected entry data size exceeded error")
-	require.ErrorIs(t, err, entities.ErrEntryVersionInvalid, "expected entry version invalid error")
-
-	_, err = sut.Delete(ctx, usecases.DeleteEntryRequest{ID: uuid.Nil, UserID: uuid.Nil})
-	require.ErrorIs(t, err, entities.ErrUserIDInvalid, "expected user ID invalid error")
-	require.ErrorIs(t, err, entities.ErrEntryIDInvalid, "expected entry ID invalid error")
 }

@@ -26,23 +26,22 @@ func Logger(logger *zap.Logger) grpc.UnaryServerInterceptor {
 
 func interceptorLogger(logger *zap.Logger) logging.Logger {
 	return logging.LoggerFunc(func(_ context.Context, lvl logging.Level, msg string, fields ...any) {
-		var values []zap.Field
-		if len(fields)%2 == 0 {
-			for i := 0; i < len(fields); i += 2 {
-				if k, ok := fields[i].(string); ok {
-					values = append(values, zap.Any(k, fields[i+1]))
-				}
+		values := make(map[string]any, len(fields)/2+1)
+		for i := 0; i < len(fields); i += 2 {
+			if key, ok := fields[i].(string); ok {
+				values[key] = fields[i+1]
 			}
 		}
+		sugar := logger.Sugar()
 		switch lvl {
 		case logging.LevelDebug:
-			logger.Debug(msg, values...)
+			sugar.Debug(msg, values)
 		case logging.LevelInfo:
-			logger.Info(msg, values...)
+			sugar.Info(msg, values)
 		case logging.LevelWarn:
-			logger.Warn(msg, values...)
+			sugar.Warn(msg, values)
 		case logging.LevelError:
-			logger.Error(msg, values...)
+			sugar.Error(msg, values)
 		default:
 			panic(fmt.Sprintf("unknown level %v", lvl))
 		}

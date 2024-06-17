@@ -5,7 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
 	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
 	"strings"
@@ -29,7 +29,7 @@ type (
 		syncing    atomic.Int64
 	}
 	EntryCreateUC interface {
-		Create(ctx context.Context, request usecases.CreateEntryRequest) (usecases.CreateEntryResponse, error)
+		Create(ctx context.Context, request entities.CreateEntryRequest) (entities.CreateEntryResponse, error)
 	}
 	createEntryMsg struct {
 		id      uuid.UUID
@@ -257,7 +257,7 @@ func (c *EntryCreateCard) createEntryCmd() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
-		resp, err := c.entryUC.Create(ctx, usecases.CreateEntryRequest{
+		resp, err := c.entryUC.Create(ctx, entities.CreateEntryRequest{
 			Key:  c.keyInput.Value(),
 			Type: core.EntryType(c.typeInput.Value()),
 			Meta: map[string]string{"description": c.metaInput.Value()},

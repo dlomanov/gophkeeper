@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
-	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
 	"github.com/dlomanov/gophkeeper/internal/core"
 	"strings"
 	"sync/atomic"
@@ -30,7 +29,7 @@ type (
 		syncing    atomic.Int64
 	}
 	EntryUpdateUC interface {
-		Update(ctx context.Context, request usecases.UpdateEntryRequest) error
+		Update(ctx context.Context, request entities.UpdateEntryRequest) error
 	}
 	updateEntryMsg struct {
 		err error
@@ -252,7 +251,7 @@ func (c *EntryUpdateCard) updateEntryCmd() tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
-		err := c.entryUC.Update(ctx, usecases.UpdateEntryRequest{
+		err := c.entryUC.Update(ctx, entities.UpdateEntryRequest{
 			ID:      c.entry.ID,
 			Version: c.entry.Version,
 			Meta:    map[string]string{"description": c.metaInput.Value()},

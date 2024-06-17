@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"embed"
+	"fmt"
 	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
 )
 
@@ -24,7 +25,7 @@ func GetMigrations() ([]migrator.Migration, error) {
 	for i, f := range files {
 		query, err := fs.ReadFile(f.Name)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("migrations: failed to read file %s: %w", f.Name, err)
 		}
 
 		result[i] = migrator.Migration{

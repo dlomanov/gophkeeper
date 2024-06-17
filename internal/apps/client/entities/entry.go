@@ -1,9 +1,9 @@
 package entities
 
 import (
+	"errors"
 	"fmt"
 	"github.com/dlomanov/gophkeeper/internal/core"
-	"go.uber.org/multierr"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,13 +39,13 @@ func NewEntry(
 ) (*Entry, error) {
 	var err error
 	if key == "" {
-		err = multierr.Append(err, fmt.Errorf("%w: %s", ErrEntryKeyInvalid, key))
+		err = errors.Join(err, fmt.Errorf("%w: %s", ErrEntryKeyInvalid, key))
 	}
 	if !typ.Valid() {
-		err = multierr.Append(err, fmt.Errorf("%w: %s", ErrEntryTypeInvalid, typ))
+		err = errors.Join(err, fmt.Errorf("%w: %s", ErrEntryTypeInvalid, typ))
 	}
 	if data == nil {
-		err = multierr.Append(err, fmt.Errorf("%w: data empty", ErrEntryDataEmpty))
+		err = errors.Join(err, fmt.Errorf("%w: data empty", ErrEntryDataEmpty))
 	}
 	if len(data) > EntryMaxDataSize {
 		err = fmt.Errorf("%w: data size exceeded: %d", ErrEntryDataSizeExceeded, len(data))
@@ -75,7 +75,7 @@ func (e *Entry) Update(opts ...EntryUpdateOption) error {
 
 	var err error
 	for _, opt := range opts {
-		err = multierr.Append(err, opt(e))
+		err = errors.Join(err, opt(e))
 	}
 	if err != nil {
 		return fmt.Errorf("entry: failed to update: %w", err)
@@ -111,3 +111,27 @@ func NewEntrySync(id uuid.UUID) *EntrySync {
 		CreatedAt: time.Now().UTC(),
 	}
 }
+
+type (
+	GetEntriesResponse struct {
+		Entries []Entry
+	}
+	CreateEntryRequest struct {
+		Key  string
+		Type core.EntryType
+		Meta map[string]string
+		Data []byte
+	}
+	CreateEntryResponse struct {
+		ID uuid.UUID
+	}
+	UpdateEntryRequest struct {
+		ID      uuid.UUID ``
+		Meta    map[string]string
+		Data    []byte
+		Version int64
+	}
+	DeleteEntryRequest struct {
+		ID uuid.UUID
+	}
+)

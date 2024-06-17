@@ -66,7 +66,7 @@ func (s *AppSuite) SetupSuite() {
 	s.listener = bufconn.Listen(bufferSize)
 
 	c := config.Parse()
-	c.LogLevel = "fatal"
+	c.LogLevel = "debug"
 	c.Cert, c.CertKey = s.readCert()
 	s.cert = c.Cert
 	c.TokenSecretKey = s.generateKey()

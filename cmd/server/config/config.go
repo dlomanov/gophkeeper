@@ -114,9 +114,12 @@ func (c config) print() {
 }
 
 func (c *config) toConfig() *srvcfg.Config {
-	cert, certKey := c.readCert()
+	cert, certKey, err := c.readCert()
+	if err != nil {
+		log.Fatalf("failed to read cert: %v", err)
+	}
 
-	res := &srvcfg.Config{
+	return &srvcfg.Config{
 		Address:        c.Address,
 		DatabaseDSN:    c.DatabaseDSN,
 		PassHashCost:   c.PassHashCost,
@@ -128,21 +131,20 @@ func (c *config) toConfig() *srvcfg.Config {
 		Cert:           cert,
 		CertKey:        certKey,
 	}
-	return res
 }
 
-func (c *config) readCert() (cert, certKey []byte) {
+func (c *config) readCert() (cert, certKey []byte, err error) {
 	if c.CertPath == "" || c.CertKeyPath == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	cert, err := os.ReadFile(c.CertPath)
+	cert, err = os.ReadFile(c.CertPath)
 	if err != nil {
-		log.Fatalf("failed to read TLS-certificate: %v", err)
+		return nil, nil, fmt.Errorf("config: failed to read TLS-certificate: %w", err)
 	}
 	certKey, err = os.ReadFile(c.CertKeyPath)
 	if err != nil {
-		log.Fatalf("failed to read TLS-certificate key: %v", err)
+		return nil, nil, fmt.Errorf("config: failed to read TLS-certificate key: %w", err)
 	}
-	return cert, certKey
+	return cert, certKey, nil
 }

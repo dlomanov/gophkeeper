@@ -7,9 +7,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/server/entrypoints/grpc"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/deps"
 	"github.com/dlomanov/gophkeeper/internal/apps/server/infra/grpcserver"
-	"github.com/dlomanov/gophkeeper/internal/apps/server/migrations"
 	"github.com/dlomanov/gophkeeper/internal/infra/logging"
-	"github.com/dlomanov/gophkeeper/internal/infra/migrator"
 	"go.uber.org/zap"
 	"net"
 	"os"
@@ -22,7 +20,6 @@ func Run(ctx context.Context, config *config.Config) error {
 	if err := config.Validate(); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
 	}
-
 	var (
 		logger *zap.Logger
 		c      *deps.Container
@@ -34,32 +31,17 @@ func Run(ctx context.Context, config *config.Config) error {
 	}); err != nil {
 		return err
 	}
+	defer func(logger *zap.Logger) { _ = logger.Sync() }(logger)
 	if c, err = deps.NewContainer(logger, config); err != nil {
 		logger.Error("failed to init container", zap.Error(err))
 		return err
 	}
 	defer closeContainer(c)
-	if err = upMigrations(c); err != nil {
-		return err
-	}
 
 	grpcsrv := startGRPC(ctx, c)
 	wait(ctx, c, grpcsrv)
 	shutdownGRPC(c, grpcsrv)
 
-	return nil
-}
-
-func upMigrations(c *deps.Container) error {
-	ms, err := migrations.GetMigrations()
-	if err != nil {
-		c.Logger.Error("failed to get migrations", zap.Error(err))
-		return err
-	}
-	if err = migrator.Migrate(c.Logger.Sugar(), c.DB.DB, ms); err != nil {
-		c.Logger.Error("failed to up migrations", zap.Error(err))
-		return err
-	}
 	return nil
 }
 
