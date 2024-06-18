@@ -27,7 +27,7 @@ func NewModel(c *deps.Container) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return m.curr.Init()
+	return tea.Batch(tea.DisableMouse, m.curr.Init())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -41,19 +41,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if res.PassAccepted && !m.accepted {
 		m.accepted = true
 		table := components.NewEntryTable("gophkeeper/entries", nil, m.c.EntryUC, m.c.Logger)
-		settings := components.NewSettings("gophkeeper/settings", nil)
 		signUp := components.NewSignUp("gophkeeper/sync/sign-up", nil, m.c.UserUC, m.c.Memcache)
 		signIn := components.NewSignIn("gophkeeper/sync/sign-in", nil, m.c.UserUC, m.c.Memcache)
+		about := components.NewSettings("gophkeeper/about", components.BuildInfo{
+			Version: m.c.Config.BuildVersion,
+			Date:    m.c.Config.BuildDate,
+			Commit:  m.c.Config.BuildCommit,
+		})
 		menu := components.NewMenu("gophkeeper", []components.Nav{
 			{Name: "Sign-up", Next: signUp},
 			{Name: "Sign-in", Next: signIn},
 			{Name: "Entries", Next: table},
-			{Name: "Settings", Next: settings},
+			{Name: "About", Next: about},
 		})
 		table.SetPrev(menu)
-		settings.SetPrev(menu)
 		signUp.SetPrev(menu)
 		signIn.SetPrev(menu)
+		about.SetPrev(menu)
 		m.curr = menu
 		return m, m.curr.Init()
 	}
@@ -83,8 +87,6 @@ func (m Model) View() string {
 	sb := strings.Builder{}
 	sb.WriteByte('\n')
 	sb.WriteString(m.curr.Title())
-	sb.WriteByte('\n')
-	sb.WriteByte('\n')
 	sb.WriteByte('\n')
 	sb.WriteByte('\n')
 	sb.WriteString(m.curr.View())

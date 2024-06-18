@@ -163,7 +163,7 @@ func (c *EntryTable) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
 		}
 		c.entries = msg.entries
 		rows := make([]table.Row, len(c.entries)+1)
-		rows[0] = table.Row{"", "press enter to create new entry"}
+		rows[0] = table.Row{"press enter", "to create new entry"}
 		for i, entry := range c.entries {
 			rows[i+1] = table.Row{
 				entry.Key,
@@ -193,6 +193,12 @@ func (c *EntryTable) View() string {
 	sb := strings.Builder{}
 	sb.WriteString(c.table.View())
 	sb.WriteByte('\n')
+	sb.WriteByte('\n')
+	sb.WriteString(subtleStyle.Render("s: sync"))
+	sb.WriteString(dotStyle)
+	sb.WriteString(subtleStyle.Render("enter: select"))
+	sb.WriteString(dotStyle)
+	sb.WriteString(subtleStyle.Render("d: delete"))
 	sb.WriteByte('\n')
 	sb.WriteString(subtleStyle.Render("esc: back"))
 	sb.WriteString(dotStyle)

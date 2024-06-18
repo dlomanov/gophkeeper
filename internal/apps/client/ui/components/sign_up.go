@@ -139,8 +139,6 @@ func (c *SignUp) View() string {
 	}
 	sb.WriteByte('\n')
 	sb.WriteByte('\n')
-	sb.WriteByte('\n')
-	sb.WriteByte('\n')
 	if c.result != "nil" {
 		sb.WriteString(errStyle.Render(c.result))
 		sb.WriteByte('\n')

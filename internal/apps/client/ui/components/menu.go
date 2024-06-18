@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-const listHeight = 14
-
 var (
 	itemStyle         = lipgloss.NewStyle().PaddingLeft(2)
 	selectedItemStyle = lipgloss.NewStyle().PaddingLeft(0).Foreground(lipgloss.Color("170"))
@@ -61,7 +59,7 @@ func NewMenu(title string, navs []Nav) *Menu {
 	for i, nav := range navs {
 		items[i] = item(nav.Name)
 	}
-	l := list.New(items, itemDelegate{}, 20, 7)
+	l := list.New(items, itemDelegate{}, 15, 8)
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.SetShowTitle(false)
