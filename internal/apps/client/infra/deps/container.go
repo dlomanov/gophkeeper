@@ -11,6 +11,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/client/config"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/entities"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/infra/repo"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/infra/services/marshal"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/infra/services/mem"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/infra/services/pass"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/migrations"
@@ -108,6 +109,7 @@ func (c *Container) Register(ctx context.Context, password core.Pass) error {
 		entryRepo,
 		entrySyncRepo,
 		encrypter,
+		marshal.EntryMarshaler{},
 		c.Memcache,
 		trm,
 	)

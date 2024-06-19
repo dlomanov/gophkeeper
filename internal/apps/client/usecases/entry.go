@@ -27,6 +27,7 @@ type (
 		entryRepo     EntryRepo
 		entrySyncRepo EntrySyncRepo
 		encrypter     Encrypter
+		marshaler     Marshaler
 		mapper        mapper.EntryMapper
 		tx            trm.Manager
 	}
@@ -47,6 +48,10 @@ type (
 		Encrypt(data []byte) ([]byte, error)
 		Decrypt(data []byte) ([]byte, error)
 	}
+	Marshaler interface {
+		Marshal(data entities.EntryData) ([]byte, error)
+		Unmarshal(typ core.EntryType, data []byte) (entities.EntryData, error)
+	}
 )
 
 func NewEntriesUC(
@@ -55,6 +60,7 @@ func NewEntriesUC(
 	entryRepo EntryRepo,
 	entrySyncRepo EntrySyncRepo,
 	encrypter Encrypter,
+	marshaler Marshaler,
 	cache *mem.Cache,
 	tx trm.Manager,
 ) *EntryUC {
@@ -65,6 +71,7 @@ func NewEntriesUC(
 		entryRepo:     entryRepo,
 		entrySyncRepo: entrySyncRepo,
 		encrypter:     encrypter,
+		marshaler:     marshaler,
 		mapper:        mapper.EntryMapper{},
 		tx:            tx,
 	}
@@ -75,27 +82,54 @@ func (uc *EntryUC) GetAll(ctx context.Context) (response entities.GetEntriesResp
 	if err != nil {
 		return response, fmt.Errorf("entry_usecase: failed to get entries: %w", err)
 	}
+	var (
+		result    = make([]entities.GetEntryResponse, len(entries))
+		decrypted []byte
+		data      any
+	)
 	for i, v := range entries {
-		data, err := uc.encrypter.Decrypt(v.Data)
-		if err != nil {
+		if decrypted, err = uc.encrypter.Decrypt(v.Data); err != nil {
 			return response, fmt.Errorf("entry_usecase: failed to decrypt entry: %w", err)
 		}
-		entries[i].Data = data
+		if data, err = uc.marshaler.Unmarshal(v.Type, decrypted); err != nil {
+			return response, fmt.Errorf("entry_usecase: failed to unmarshal entry: %w", err)
+		}
+		result[i] = entities.GetEntryResponse{
+			ID:            v.ID,
+			Key:           v.Key,
+			Type:          v.Type,
+			Data:          data,
+			Meta:          v.Meta,
+			Version:       v.Version,
+			GlobalVersion: v.GlobalVersion,
+			CreatedAt:     v.CreatedAt,
+			UpdatedAt:     v.UpdatedAt,
+		}
 	}
-	response.Entries = entries
-	return response, err
+	response.Entries = result
+	return response, nil
 }
 
 func (uc *EntryUC) Create(
 	ctx context.Context,
 	request entities.CreateEntryRequest,
 ) (response entities.CreateEntryResponse, err error) {
-	var data []byte
-	if data, err = uc.encrypter.Encrypt(request.Data); err != nil {
+	if err = request.Validate(); err != nil {
+		return response, fmt.Errorf("entry_usecase: invalid request: %w", err)
+	}
+	var (
+		data      []byte
+		encrypted []byte
+	)
+	if data, err = uc.marshaler.Marshal(request.Data); err != nil {
+		uc.logger.Error("failed to marshal entry data", zap.Error(err))
+		return response, fmt.Errorf("entry_usecase: failed to marshal entry data: %w", err)
+	}
+	if encrypted, err = uc.encrypter.Encrypt(data); err != nil {
 		uc.logger.Error("failed to encrypt entry data", zap.Error(err))
 		return response, fmt.Errorf("entry_usecase: failed to encrypt entry data: %w", err)
 	}
-	entry, err := entities.NewEntry(request.Key, request.Type, data)
+	entry, err := entities.NewEntry(request.Key, request.Type, encrypted)
 	if err != nil {
 		uc.logger.Error("failed to encrypt entry data", zap.Error(err))
 		return response, fmt.Errorf("entry_usecase: %w", err)
@@ -125,6 +159,9 @@ func (uc *EntryUC) Update(
 	ctx context.Context,
 	request entities.UpdateEntryRequest,
 ) (err error) {
+	if err = request.Validate(); err != nil {
+		return fmt.Errorf("entry_usecase: invalid request: %w", err)
+	}
 	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
 		entry, err := uc.entryRepo.Get(ctx, request.ID)
 		switch {
@@ -133,13 +170,19 @@ func (uc *EntryUC) Update(
 		case err != nil:
 			return fmt.Errorf("entry_usecase: failed to get entry: %w", err)
 		}
-		data, err := uc.encrypter.Encrypt(request.Data)
-		if err != nil {
+		var (
+			data      []byte
+			encrypted []byte
+		)
+		if data, err = uc.marshaler.Marshal(request.Data); err != nil {
+			return fmt.Errorf("entry_usecase: failed to marshal entry data: %w", err)
+		}
+		if encrypted, err = uc.encrypter.Encrypt(data); err != nil {
 			return fmt.Errorf("entry_usecase: failed to encrypt entry data: %w", err)
 		}
 		if err = entry.Update(
 			entities.UpdateEntryMeta(request.Meta),
-			entities.UpdateEntryData(data)); err != nil {
+			entities.UpdateEntryData(encrypted)); err != nil {
 			return fmt.Errorf("entry_usecase: %w", err)
 		}
 		if err = uc.entryRepo.Update(ctx, entry); err != nil {
@@ -233,18 +276,20 @@ func (uc *EntryUC) pushEntry(ctx context.Context, id uuid.UUID) error {
 	}
 
 	entry, err := uc.entryRepo.Get(ctx, id)
-	typ := getPushType(entry, err)
+	var (
+		typ       = getPushType(entry, err)
+		decrypted []byte
+	)
 	switch typ {
 	case pushTypeCreate:
-		data, err := uc.encrypter.Decrypt(entry.Data)
-		if err != nil {
+		if decrypted, err = uc.encrypter.Decrypt(entry.Data); err != nil {
 			return fmt.Errorf("entry_usecase: failed to decrypt entry data: %w", err)
 		}
 		_, err = uc.entryClient.Create(ctx, &pb.CreateEntryRequest{
 			Key:  entry.Key,
 			Type: uc.mapper.ToAPIType(entry.Type),
 			Meta: entry.Meta,
-			Data: data,
+			Data: decrypted,
 		})
 		switch {
 		case status.Code(err) == codes.InvalidArgument:
@@ -259,14 +304,13 @@ func (uc *EntryUC) pushEntry(ctx context.Context, id uuid.UUID) error {
 			return fmt.Errorf("entry_usecase: failed to create entry: %w", err)
 		}
 	case pushTypeUpdate:
-		data, err := uc.encrypter.Decrypt(entry.Data)
-		if err != nil {
+		if decrypted, err = uc.encrypter.Decrypt(entry.Data); err != nil {
 			return fmt.Errorf("entry_usecase: failed to decrypt entry data: %w", err)
 		}
 		_, err = uc.entryClient.Update(ctx, &pb.UpdateEntryRequest{
 			Id:      id.String(),
 			Meta:    entry.Meta,
-			Data:    data,
+			Data:    decrypted,
 			Version: entry.GlobalVersion,
 		})
 		switch {
@@ -339,7 +383,7 @@ func (uc *EntryUC) fetch(ctx context.Context) error {
 			continue
 		}
 		now := time.Now().UTC()
-		data, err := uc.encrypter.Encrypt(mentry.Data)
+		encrypted, err := uc.encrypter.Encrypt(mentry.Data)
 		if err != nil {
 			return fmt.Errorf("entry_usecase: failed to encrypt entry data: %w", err)
 		}
@@ -348,7 +392,7 @@ func (uc *EntryUC) fetch(ctx context.Context) error {
 			Key:           mentry.Key,
 			Type:          uc.toEntityType(mentry.Type),
 			Meta:          mentry.Meta,
-			Data:          data,
+			Data:          encrypted,
 			GlobalVersion: mentry.Version,
 			Version:       mentry.Version,
 			CreatedAt:     now,
@@ -364,7 +408,7 @@ func (uc *EntryUC) fetch(ctx context.Context) error {
 		if !ok {
 			continue
 		}
-		data, err := uc.encrypter.Encrypt(mentry.Data)
+		encrypted, err := uc.encrypter.Encrypt(mentry.Data)
 		if err != nil {
 			return fmt.Errorf("entry_usecase: failed to encrypt entry data: %w", err)
 		}
@@ -374,7 +418,7 @@ func (uc *EntryUC) fetch(ctx context.Context) error {
 			Key:           mentry.Key,
 			Type:          uc.toEntityType(mentry.Type),
 			Meta:          mentry.Meta,
-			Data:          data,
+			Data:          encrypted,
 			GlobalVersion: mentry.Version,
 			Version:       mentry.Version,
 			UpdatedAt:     now,

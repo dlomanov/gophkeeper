@@ -114,13 +114,24 @@ func NewEntrySync(id uuid.UUID) *EntrySync {
 
 type (
 	GetEntriesResponse struct {
-		Entries []Entry
+		Entries []GetEntryResponse
+	}
+	GetEntryResponse struct {
+		ID            uuid.UUID
+		Key           string
+		Type          core.EntryType
+		Meta          map[string]string
+		Data          EntryData
+		GlobalVersion int64
+		Version       int64
+		CreatedAt     time.Time
+		UpdatedAt     time.Time
 	}
 	CreateEntryRequest struct {
 		Key  string
 		Type core.EntryType
 		Meta map[string]string
-		Data []byte
+		Data EntryData
 	}
 	CreateEntryResponse struct {
 		ID uuid.UUID
@@ -128,10 +139,81 @@ type (
 	UpdateEntryRequest struct {
 		ID      uuid.UUID ``
 		Meta    map[string]string
-		Data    []byte
+		Data    EntryData
 		Version int64
 	}
 	DeleteEntryRequest struct {
 		ID uuid.UUID
 	}
+	EntryData         any
+	EntryDataPassword struct {
+		Login    string
+		Password string
+	}
+	EntryDataNote   string
+	EntryDataBinary []byte
+	EntryDataCard   struct {
+		Number  string
+		Expires string
+		Cvc     string
+		Owner   string
+	}
 )
+
+func (r CreateEntryRequest) Validate() (err error) {
+	if r.Key == "" {
+		err = errors.Join(err, ErrEntryKeyInvalid)
+	}
+	if !r.Type.Valid() {
+		err = errors.Join(err, ErrEntryTypeInvalid)
+	}
+	if !entryDataValid(r.Data) {
+		err = errors.Join(err, ErrEntryTypeInvalid)
+	}
+	mismatchErr := func() error {
+		return fmt.Errorf("%w: type and data type mismatch: %s vs %T", ErrEntryTypeInvalid, r.Type, r.Data)
+	}
+	switch r.Type {
+	case core.EntryTypePassword:
+		if _, ok := r.Data.(EntryDataPassword); !ok {
+			err = errors.Join(err, mismatchErr())
+		}
+	case core.EntryTypeNote:
+		if _, ok := r.Data.(EntryDataNote); !ok {
+			err = errors.Join(err, mismatchErr())
+		}
+	case core.EntryTypeCard:
+		if _, ok := r.Data.(EntryDataCard); !ok {
+			err = errors.Join(err, mismatchErr())
+		}
+	case core.EntryTypeBinary:
+		if _, ok := r.Data.(EntryDataBinary); !ok {
+			err = errors.Join(err, mismatchErr())
+		}
+	default:
+		err = errors.Join(err, fmt.Errorf("%w: unknown entry type: %s", ErrEntryTypeInvalid, r.Type))
+	}
+	return err
+}
+
+func (r UpdateEntryRequest) Validate() (err error) {
+	if r.ID == uuid.Nil {
+		err = errors.Join(err, ErrEntryIDInvalid)
+	}
+	if !entryDataValid(r.Data) {
+		err = errors.Join(err, ErrEntryTypeInvalid)
+	}
+	return err
+}
+
+func entryDataValid(data EntryData) bool {
+	switch data.(type) {
+	case EntryDataPassword:
+	case EntryDataNote:
+	case EntryDataCard:
+	case EntryDataBinary:
+	default:
+		return false
+	}
+	return true
+}

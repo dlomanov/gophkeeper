@@ -27,5 +27,7 @@ go.work
 # Logs
 *.log
 
-# Sqlite database
+# App settigns
 *.db
+/cmd/client/downloads
+!/cmd/client/build/*.exe

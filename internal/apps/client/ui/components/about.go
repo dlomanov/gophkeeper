@@ -1,16 +1,19 @@
 package components
 
 import (
+	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base"
+	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base/styles"
 	"strings"
 )
 
-var _ Component = (*About)(nil)
+var _ base.Component = (*About)(nil)
 
 type (
 	About struct {
 		title     string
-		back      Component
+		back      base.Component
 		buildInfo BuildInfo
 	}
 	BuildInfo struct {
@@ -34,47 +37,46 @@ func (c *About) Title() string {
 	return c.title
 }
 
-func (c *About) Init() tea.Cmd {
-	return nil
+func (c *About) Init() (result base.InitResult) {
+	return result
 }
 
-func (c *About) Update(msg tea.Msg) (result UpdateResult, cmd tea.Cmd) {
+func (c *About) Update(msg tea.Msg) (result base.UpdateResult) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		k := msg.String()
 		switch k {
 		case "q", "ctrl+c":
 			result.Quitting = true
-			return result, tea.Quit
+			return result.AppendCmd(tea.Quit)
 		case "esc":
 			result.Prev = c.back
-			return result, nil
 		}
 	}
-
-	return result, nil
+	return result
 }
 
 func (c *About) View() string {
 	sb := strings.Builder{}
-	sb.WriteString("build info\n")
-	sb.WriteString(" - version: ")
-	sb.WriteString(c.buildInfo.Version)
-	sb.WriteByte('\n')
-	sb.WriteString(" - date:    ")
-	sb.WriteString(c.buildInfo.Date)
-	sb.WriteByte('\n')
-	sb.WriteString(" - commit:  ")
-	sb.WriteString(c.buildInfo.Commit)
-	sb.WriteByte('\n')
-	sb.WriteByte('\n')
-	sb.WriteString(subtleStyle.Render("esc: back"))
-	sb.WriteString(dotStyle)
-	sb.WriteString(subtleStyle.Render("q: quit"))
+	_, err := fmt.Fprintf(&sb, `build into:
+ - version: %s
+ - date:    %s
+ - commit:  %s
+`,
+		c.buildInfo.Version,
+		c.buildInfo.Date,
+		c.buildInfo.Commit)
+	if err != nil { // err unexpected
+		panic(err)
+	}
+
 	sb.WriteByte('\n')
 	sb.WriteByte('\n')
+	sb.WriteString(styles.SubtleStyle.Render("esc: back"))
+	sb.WriteString(styles.DotStyle)
+	sb.WriteString(styles.SubtleStyle.Render("q: quit"))
 	return sb.String()
 }
 
-func (c *About) SetPrev(back Component) {
+func (c *About) SetPrev(back base.Component) {
 	c.back = back
 }
