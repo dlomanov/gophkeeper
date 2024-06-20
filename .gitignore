@@ -30,4 +30,4 @@ go.work
 # App settigns
 *.db
 /cmd/client/downloads
-!/cmd/client/build/*.exe
+!/cmd/client/builds/*.exe
