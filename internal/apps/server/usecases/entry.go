@@ -192,7 +192,7 @@ func (uc *EntryUC) Create(
 	request entities.CreateEntryRequest,
 ) (response entities.CreateEntryResponse, err error) {
 	if err = request.Validate(); err != nil {
-		return response, fmt.Errorf("create entry: invalid request: %w", err)
+		return response, fmt.Errorf("create_entry: invalid request: %w", err)
 	}
 	userID := request.UserID
 
@@ -216,20 +216,20 @@ func (uc *EntryUC) Create(
 			conflictKey := uc.newConflictKey(entry.Key, entry.Version)
 			conflictEntry, err := entities.NewEntry(conflictKey, entry.UserID, entry.Type, entry.Data)
 			if err != nil {
-				return fmt.Errorf("create_entry: failed to create conflict entry: %w: %w", err, entities.ErrEntryExists)
+				return fmt.Errorf("create_entry: failed to request conflict entry: %w: %w", err, entities.ErrEntryExists)
 			}
 			conflictEntry.Meta = request.Meta
 			conflictEntry.Data = encrypted
 			if err = uc.entryRepo.Create(ctx, conflictEntry); err != nil {
-				return fmt.Errorf("create_entry: failed to create conflict entry in repo: %w: %w", err, entities.ErrEntryExists)
+				return fmt.Errorf("create_entry: failed to request conflict entry in repo: %w: %w", err, entities.ErrEntryExists)
 			}
 			entry = conflictEntry
 		case err != nil:
-			return fmt.Errorf("create_entry: failed to create entry in repo: %w", err)
+			return fmt.Errorf("create_entry: failed to request entry in repo: %w", err)
 		}
 		return nil
 	}); err != nil {
-		uc.logger.Error("failed to create entry",
+		uc.logger.Error("failed to request entry",
 			zap.String("user_id", userID.String()),
 			zap.String("key", request.Key),
 			zap.Error(err))
@@ -279,12 +279,12 @@ func (uc *EntryUC) Update(
 			conflictKey := uc.newConflictKey(entry.Key, request.Version)
 			conflictEntry, err := entities.NewEntry(conflictKey, entry.UserID, entry.Type, entry.Data)
 			if err != nil {
-				return fmt.Errorf("update_entry: failed to create conflict entry: %w", err)
+				return fmt.Errorf("update_entry: failed to request conflict entry: %w", err)
 			}
 			conflictEntry.Meta = request.Meta
 			conflictEntry.Data = encrypted
 			if err = uc.entryRepo.Create(ctx, conflictEntry); err != nil {
-				return fmt.Errorf("update_entry: failed to create conflict entry in storage: %w", err)
+				return fmt.Errorf("update_entry: failed to request conflict entry in storage: %w", err)
 			}
 			entry = conflictEntry
 			return nil

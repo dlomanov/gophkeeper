@@ -8,213 +8,536 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/dlomanov/gophkeeper/internal/infra/encrypto"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
-	"reflect"
-	"slices"
 	"strings"
 	"testing"
-	"time"
 )
 
-func TestEntryUC(t *testing.T) {
-	ctx := context.Background()
+func TestEntryUC_GetAll(t *testing.T) {
+	var (
+		ctx     = context.Background()
+		sut     = createSUT(t)
+		userID1 = uuid.New()
+		userID2 = uuid.New()
+	)
+
+	empty := func(t require.TestingT, request any, response any, args ...any) {
+		resp := response.(entities.GetEntriesResponse)
+		require.Empty(t, resp.Entries, args...)
+	}
+	exactErr := func(target error) require.ErrorAssertionFunc {
+		return func(t require.TestingT, err error, args ...any) {
+			require.ErrorIs(t, err, target, args...)
+		}
+	}
+	requests := []entities.CreateEntryRequest{
+		{
+			Key:    "key1",
+			UserID: userID1,
+			Type:   core.EntryTypeNote,
+			Meta:   map[string]string{"description": "test_note_1"},
+			Data:   []byte("test_data_1"),
+		},
+		{
+			Key:    "key2",
+			UserID: userID1,
+			Type:   core.EntryTypeNote,
+			Meta:   map[string]string{"description": "test_note_2"},
+			Data:   []byte("test_data_2"),
+		},
+	}
+	responses := make(map[uuid.UUID]entities.CreateEntryRequest, len(requests))
+	for _, req := range requests {
+		resp, err := sut.Create(ctx, req)
+		require.NoError(t, err)
+		responses[resp.ID] = req
+	}
+
+	tests := []struct {
+		name         string
+		request      entities.GetEntriesRequest
+		wantErr      require.ErrorAssertionFunc
+		wantResponse require.ComparisonAssertionFunc
+	}{
+		{
+			name: "invalid user ID",
+			request: entities.GetEntriesRequest{
+				UserID: uuid.Nil,
+			},
+			wantErr:      exactErr(entities.ErrUserIDInvalid),
+			wantResponse: empty,
+		},
+		{
+			name: "empty",
+			request: entities.GetEntriesRequest{
+				UserID: userID2,
+			},
+			wantErr:      require.NoError,
+			wantResponse: empty,
+		},
+		{
+			name: "all",
+			request: entities.GetEntriesRequest{
+				UserID: userID1,
+			},
+			wantErr: require.NoError,
+			wantResponse: func(t require.TestingT, request any, response any, _ ...any) {
+				req := request.(entities.GetEntriesRequest)
+				resp := response.(entities.GetEntriesResponse)
+				require.Len(t, resp.Entries, len(responses))
+				for _, entry := range resp.Entries {
+					created, ok := responses[entry.ID]
+					require.True(t, ok, "entry should exist")
+					require.Equal(t, created.Key, entry.Key)
+					require.Equal(t, created.Type, entry.Type)
+					require.Equal(t, created.Data, entry.Data)
+					require.Equal(t, created.Meta, entry.Meta)
+					require.Equal(t, created.UserID, entry.UserID)
+					require.Equal(t, req.UserID, entry.UserID)
+					require.Equal(t, int64(1), entry.Version)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := sut.GetEntries(ctx, tt.request)
+			tt.wantErr(t, err)
+			tt.wantResponse(t, tt.request, resp)
+		})
+	}
+}
+
+func TestEntryUC_GetEntriesDiff(t *testing.T) {
+	var (
+		ctx     = context.Background()
+		sut     = createSUT(t)
+		userID1 = uuid.New()
+		userID2 = uuid.New()
+	)
+
+	empty := func(t require.TestingT, request any, response any, args ...any) {
+		resp := response.(entities.GetEntriesDiffResponse)
+		require.Empty(t, resp.Entries, args...)
+		require.Empty(t, resp.CreateIDs, args...)
+		require.Empty(t, resp.UpdateIDs, args...)
+		require.Empty(t, resp.DeleteIDs, args...)
+	}
+	exactErr := func(target error) require.ErrorAssertionFunc {
+		return func(t require.TestingT, err error, args ...any) {
+			require.ErrorIs(t, err, target, args...)
+		}
+	}
+	requests := []entities.CreateEntryRequest{
+		{
+			Key:    "key1",
+			UserID: userID1,
+			Type:   core.EntryTypeNote,
+			Meta:   map[string]string{"description": "test_note_1"},
+			Data:   []byte("test_data_1"),
+		},
+		{
+			Key:    "key2",
+			UserID: userID1,
+			Type:   core.EntryTypeNote,
+			Meta:   map[string]string{"description": "test_note_2"},
+			Data:   []byte("test_data_2"),
+		},
+		{
+			Key:    "key3",
+			UserID: userID1,
+			Type:   core.EntryTypeNote,
+			Meta:   map[string]string{"description": "test_note_3"},
+			Data:   []byte("test_data_3"),
+		},
+	}
+	responses := make(map[uuid.UUID]entities.CreateEntryRequest, len(requests))
+	for _, req := range requests {
+		resp, err := sut.Create(ctx, req)
+		require.NoError(t, err)
+		responses[resp.ID] = req
+	}
+	versions := make([]core.EntryVersion, 0, len(responses))
+	for k := range responses {
+		versions = append(versions, core.EntryVersion{ID: k, Version: 1})
+	}
+	clone := func(
+		versions []core.EntryVersion,
+		fn func(v []core.EntryVersion) []core.EntryVersion,
+	) []core.EntryVersion {
+		v := make([]core.EntryVersion, len(versions))
+		copy(v, versions)
+		return fn(v)
+	}
+
+	tests := []struct {
+		name         string
+		request      entities.GetEntriesDiffRequest
+		pretest      func()
+		wantErr      require.ErrorAssertionFunc
+		wantResponse require.ComparisonAssertionFunc
+	}{
+		{
+			name: "invalid user ID",
+			request: entities.GetEntriesDiffRequest{
+				UserID:   uuid.Nil,
+				Versions: versions,
+			},
+			wantErr:      exactErr(entities.ErrUserIDInvalid),
+			wantResponse: empty,
+		},
+		{
+			name: "delete all",
+			request: entities.GetEntriesDiffRequest{
+				UserID:   userID2,
+				Versions: versions,
+			},
+			wantErr: require.NoError,
+			wantResponse: func(t require.TestingT, request any, response any, _ ...any) {
+				req := request.(entities.GetEntriesDiffRequest)
+				resp := response.(entities.GetEntriesDiffResponse)
+				require.Empty(t, resp.Entries)
+				require.Empty(t, resp.CreateIDs)
+				require.Empty(t, resp.UpdateIDs)
+				require.Len(t, resp.DeleteIDs, len(req.Versions))
+				del := make(map[uuid.UUID]struct{}, len(resp.DeleteIDs))
+				for _, id := range resp.DeleteIDs {
+					del[id] = struct{}{}
+				}
+				for _, version := range req.Versions {
+					_, ok := del[version.ID]
+					require.True(t, ok, "version should match with deleted")
+				}
+			},
+		},
+		{
+			name: "diff",
+			request: entities.GetEntriesDiffRequest{
+				UserID: userID1,
+				Versions: clone(versions, func(v []core.EntryVersion) []core.EntryVersion {
+					v[0].Version = 2
+					v[len(v)-1].ID = uuid.New()
+					return v
+				}),
+			},
+			wantErr: require.NoError,
+			wantResponse: func(t require.TestingT, request any, response any, _ ...any) {
+				req := request.(entities.GetEntriesDiffRequest)
+				resp := response.(entities.GetEntriesDiffResponse)
+				require.Len(t, resp.Entries, 2)
+				require.Len(t, resp.CreateIDs, 1)
+				require.Len(t, resp.UpdateIDs, 1)
+				require.Len(t, resp.DeleteIDs, 1)
+				require.Equal(t, resp.DeleteIDs[0], req.Versions[len(req.Versions)-1].ID)
+				require.Equal(t, resp.UpdateIDs[0], req.Versions[0].ID)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.pretest != nil {
+				tt.pretest()
+			}
+			resp, err := sut.GetEntriesDiff(ctx, tt.request)
+			tt.wantErr(t, err)
+			tt.wantResponse(t, tt.request, resp)
+		})
+	}
+}
+
+func TestEntryUC_Create(t *testing.T) {
+	var (
+		ctx     = context.Background()
+		sut     = createSUT(t)
+		userID1 = uuid.New()
+		userID2 = uuid.New()
+	)
+
+	okResponse := func(t require.TestingT, request any, response any, args ...any) {
+		req := request.(entities.CreateEntryRequest)
+		resp := response.(entities.CreateEntryResponse)
+		getResp, err := sut.Get(ctx, entities.GetEntryRequest{
+			ID:     resp.ID,
+			UserID: req.UserID,
+		})
+		require.NoError(t, err)
+		require.Equal(t, req.Key, getResp.Entry.Key)
+		require.Equal(t, req.UserID, getResp.Entry.UserID)
+		require.Equal(t, req.Type, getResp.Entry.Type)
+		require.Equal(t, req.Meta, getResp.Entry.Meta)
+		require.Equal(t, req.Data, getResp.Entry.Data)
+		require.Equal(t, resp.ID, getResp.Entry.ID)
+		require.Equal(t, resp.Version, getResp.Entry.Version)
+	}
+
+	tests := []struct {
+		name         string
+		request      entities.CreateEntryRequest
+		wantErr      require.ErrorAssertionFunc
+		wantResponse require.ComparisonAssertionFunc
+	}{
+		{
+			name: "key1 user1",
+			request: entities.CreateEntryRequest{
+				Key:    "key1",
+				UserID: userID1,
+				Type:   core.EntryTypePassword,
+				Meta:   nil,
+				Data:   []byte("test_data_1"),
+			},
+			wantErr:      require.NoError,
+			wantResponse: okResponse,
+		},
+		{
+			name: "key1 user2",
+			request: entities.CreateEntryRequest{
+				Key:    "key1",
+				UserID: userID2,
+				Type:   core.EntryTypePassword,
+				Meta:   nil,
+				Data:   []byte("test_data_1"),
+			},
+			wantErr:      require.NoError,
+			wantResponse: okResponse,
+		},
+		{
+			name: "key1 user2 conflict",
+			request: entities.CreateEntryRequest{
+				Key:    "key1",
+				UserID: userID2,
+				Type:   core.EntryTypePassword,
+				Meta:   nil,
+				Data:   []byte("test_data_1"),
+			},
+			wantErr: require.NoError,
+			wantResponse: func(t require.TestingT, request any, response any, args ...any) {
+				req := request.(entities.CreateEntryRequest)
+				resp := response.(entities.CreateEntryResponse)
+				getResp, err := sut.Get(ctx, entities.GetEntryRequest{
+					ID:     resp.ID,
+					UserID: req.UserID,
+				})
+				require.NoError(t, err)
+				require.NotEqual(t, req.Key, getResp.Entry.Key)
+				require.True(t, strings.HasPrefix(getResp.Entry.Key, req.Key), "key should be prefix of %s", req.Key)
+				require.Equal(t, req.UserID, getResp.Entry.UserID)
+				require.Equal(t, req.Type, getResp.Entry.Type)
+				require.Equal(t, req.Meta, getResp.Entry.Meta)
+				require.Equal(t, req.Data, getResp.Entry.Data)
+				require.Equal(t, resp.ID, getResp.Entry.ID)
+				require.Equal(t, resp.Version, getResp.Entry.Version)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response, err := sut.Create(ctx, tt.request)
+			tt.wantErr(t, err)
+			tt.wantResponse(t, tt.request, response)
+		})
+	}
+}
+
+func TestEntryUC_Delete(t *testing.T) {
+	var (
+		ctx     = context.Background()
+		sut     = createSUT(t)
+		userID1 = uuid.New()
+		userID2 = uuid.New()
+	)
+
+	nothing := func(t require.TestingT, request any, response any, args ...any) {}
+	exactErr := func(target error) require.ErrorAssertionFunc {
+		return func(t require.TestingT, err error, args ...any) {
+			require.ErrorIs(t, err, target, args...)
+		}
+	}
+
+	createResponse, err := sut.Create(ctx, entities.CreateEntryRequest{
+		Key:    "key1",
+		UserID: userID1,
+		Type:   core.EntryTypeNote,
+		Meta:   map[string]string{"description": "test_note_1"},
+		Data:   []byte("test_data_1"),
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name         string
+		request      entities.DeleteEntryRequest
+		wantErr      require.ErrorAssertionFunc
+		wantResponse require.ComparisonAssertionFunc
+	}{
+		{
+			name: "not found with random ID",
+			request: entities.DeleteEntryRequest{
+				ID:     uuid.New(),
+				UserID: userID1,
+			},
+			wantErr:      exactErr(entities.ErrEntryNotFound),
+			wantResponse: nothing,
+		},
+		{
+			name: "not found with wrong user ID",
+			request: entities.DeleteEntryRequest{
+				ID:     createResponse.ID,
+				UserID: userID2,
+			},
+			wantErr:      exactErr(entities.ErrEntryNotFound),
+			wantResponse: nothing,
+		},
+		{
+			name: "deleted",
+			request: entities.DeleteEntryRequest{
+				ID:     createResponse.ID,
+				UserID: userID1,
+			},
+			wantErr: require.NoError,
+			wantResponse: func(t require.TestingT, request any, response any, args ...any) {
+				req := request.(entities.DeleteEntryRequest)
+				resp := response.(entities.DeleteEntryResponse)
+				require.Equal(t, req.ID, resp.ID)
+				require.Equal(t, createResponse.ID, resp.ID)
+				require.Equal(t, createResponse.Version, resp.Version)
+				_, err := sut.Get(ctx, entities.GetEntryRequest{ID: req.ID, UserID: req.UserID})
+				require.ErrorIs(t, err, entities.ErrEntryNotFound)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := sut.Delete(ctx, tt.request)
+			tt.wantErr(t, err)
+			tt.wantResponse(t, tt.request, resp)
+		})
+	}
+}
+
+func TestEntryUC_Update(t *testing.T) {
+	var (
+		ctx     = context.Background()
+		sut     = createSUT(t)
+		userID1 = uuid.New()
+		userID2 = uuid.New()
+	)
+
+	nothing := func(t require.TestingT, request any, response any, args ...any) {}
+	exactErr := func(target error) require.ErrorAssertionFunc {
+		return func(t require.TestingT, err error, args ...any) {
+			require.ErrorIs(t, err, target, args...)
+		}
+	}
+
+	createResponse, err := sut.Create(ctx, entities.CreateEntryRequest{
+		Key:    "key1",
+		UserID: userID1,
+		Type:   core.EntryTypeNote,
+		Meta:   map[string]string{"description": "test_note_1"},
+		Data:   []byte("test_data_1"),
+	})
+	require.NoError(t, err)
+	updatedMeta := map[string]string{"description": "test_note_2"}
+	updatedData := []byte("test_data_2")
+
+	tests := []struct {
+		name         string
+		request      entities.UpdateEntryRequest
+		wantErr      require.ErrorAssertionFunc
+		wantResponse require.ComparisonAssertionFunc
+	}{
+		{
+			name: "not found with random ID",
+			request: entities.UpdateEntryRequest{
+				ID:      uuid.New(),
+				Meta:    updatedMeta,
+				Data:    updatedData,
+				Version: createResponse.Version,
+				UserID:  userID1,
+			},
+			wantErr:      exactErr(entities.ErrEntryNotFound),
+			wantResponse: nothing,
+		},
+		{
+			name: "not found with wrong user ID",
+			request: entities.UpdateEntryRequest{
+				ID:      createResponse.ID,
+				Meta:    updatedMeta,
+				Data:    updatedData,
+				Version: createResponse.Version,
+				UserID:  userID2,
+			},
+			wantErr:      exactErr(entities.ErrEntryNotFound),
+			wantResponse: nothing,
+		},
+		{
+			name: "update",
+			request: entities.UpdateEntryRequest{
+				ID:      createResponse.ID,
+				Meta:    updatedMeta,
+				Data:    updatedData,
+				Version: createResponse.Version,
+				UserID:  userID1,
+			},
+			wantErr: require.NoError,
+			wantResponse: func(t require.TestingT, request any, response any, args ...any) {
+				req := request.(entities.UpdateEntryRequest)
+				resp := response.(entities.UpdateEntryResponse)
+				require.Equal(t, req.ID, resp.ID)
+				require.Equal(t, createResponse.ID, resp.ID)
+				require.Equal(t, createResponse.Version+1, resp.Version)
+				getResp, err := sut.Get(ctx, entities.GetEntryRequest{ID: resp.ID, UserID: req.UserID})
+				require.NoError(t, err)
+				require.Equal(t, req.Meta, getResp.Entry.Meta)
+				require.Equal(t, req.Data, getResp.Entry.Data)
+			},
+		},
+		{
+			name: "update conflict",
+			request: entities.UpdateEntryRequest{
+				ID:      createResponse.ID,
+				Meta:    map[string]string{"description": "conflict"},
+				Data:    []byte("conflict"),
+				Version: createResponse.Version + 2,
+				UserID:  userID1,
+			},
+			wantErr: require.NoError,
+			wantResponse: func(t require.TestingT, request any, response any, args ...any) {
+				req := request.(entities.UpdateEntryRequest)
+				resp := response.(entities.UpdateEntryResponse)
+				require.NotEqual(t, req.ID, resp.ID)
+				require.Equal(t, int64(1), resp.Version)
+				getResp, err := sut.Get(ctx, entities.GetEntryRequest{ID: resp.ID, UserID: req.UserID})
+				require.NoError(t, err)
+				require.Equal(t, req.Meta, getResp.Entry.Meta)
+				require.Equal(t, req.Data, getResp.Entry.Data)
+				require.NotEqual(t, req.Version, getResp.Entry.Version)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := sut.Update(ctx, tt.request)
+			tt.wantErr(t, err)
+			tt.wantResponse(t, tt.request, resp)
+		})
+	}
+}
+
+func createSUT(t *testing.T) *usecases.EntryUC {
 	merger := diff.NewEntry()
 	enc, err := encrypto.NewEncrypter([]byte("1234567890123456"))
 	require.NoError(t, err, "no error expected")
-	sut := usecases.NewEntryUC(
+	return usecases.NewEntryUC(
 		zaptest.NewLogger(t, zaptest.Level(zap.FatalLevel)),
 		NewMockEntryRepo(),
 		merger,
 		enc,
 		NewMockTrmManager())
-	userID1 := uuid.New()
-	userID2 := uuid.New()
-
-	// GetEntries (empty)
-	getAll, err := sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
-	require.NoError(t, err, "no error expected")
-	require.Empty(t, getAll.Entries, "expected empty list")
-
-	// Create + GetEntries
-	entries := make([]*entities.Entry, 3)
-	entries[0], err = entities.NewEntry("key1", userID1, core.EntryTypePassword, []byte("test_data_1"))
-	require.NoError(t, err, "no error expected")
-	entries[1], err = entities.NewEntry("key2", userID1, core.EntryTypeBinary, []byte("test_data_2"))
-	require.NoError(t, err, "no error expected")
-	entries[2], err = entities.NewEntry("key3", userID1, core.EntryTypeNote, []byte("test_data_3"))
-	require.NoError(t, err, "no error expected")
-	for i, entry := range entries {
-		created, err := sut.Create(ctx, entities.CreateEntryRequest{
-			Key:    entry.Key,
-			UserID: entry.UserID,
-			Type:   entry.Type,
-			Meta:   entry.Meta,
-			Data:   entry.Data,
-		})
-		require.NoError(t, err, "no error expected")
-		assert.NotEmpty(t, created.ID, "expected non-empty ID")
-		assert.Equal(t, created.Version, int64(1), "expected version 1 after creation")
-		entries[i].ID = created.ID
-		entries[i].Version = created.Version
-		time.Sleep(time.Millisecond) // for sorting purposes
-	}
-	created, err := sut.Create(ctx, entities.CreateEntryRequest{
-		Key:    entries[0].Key,
-		UserID: userID1,
-		Type:   core.EntryTypeNote,
-		Meta:   map[string]string{"description": "test_note_4"},
-		Data:   []byte("test_data_4"),
-	})
-	require.NoError(t, err, "no error expected")
-	require.NotEqual(t, entries[0].ID, created.ID, "expected different IDs")
-	got, err := sut.Get(ctx, entities.GetEntryRequest{
-		ID:     created.ID,
-		UserID: userID1,
-	})
-	require.NoError(t, err, "no error expected")
-	require.NotNil(t, got.Entry, "expected non-nil entry")
-	require.Equal(t, created.ID, got.Entry.ID, "expected same IDs")
-	require.True(t, strings.HasPrefix(got.Entry.Key, entries[0].Key), "expected key prefix")
-	require.Equal(t, got.Entry.UserID, entries[0].UserID, "expected same user IDs")
-	require.NotEqual(t, got.Entry.Type, entries[0].Type, "expected different entry types")
-	require.False(t, reflect.DeepEqual(got.Entry.Meta, entries[0].Meta), "expected different entry meta")
-	require.NotEqual(t, got.Entry.Data, entries[0].Data, "expected different entry data")
-	require.Equal(t, got.Entry.Version, entries[0].Version, "expected same entry versions")
-	require.NotEmpty(t, got.Entry.CreatedAt, "expected non-empty created at")
-	require.NotEmpty(t, got.Entry.UpdatedAt, "expected non-empty created at")
-	_, err = sut.Delete(ctx, entities.DeleteEntryRequest{
-		ID:     created.ID,
-		UserID: userID1,
-	})
-	require.NoError(t, err, "no error expected")
-
-	getAll, err = sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
-	require.NoError(t, err, "no error expected")
-	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
-	for i, entry := range getAll.Entries {
-		entries[i].CreatedAt = entry.CreatedAt
-		entries[i].UpdatedAt = entry.UpdatedAt
-		assert.Equal(t, entries[i].Key, entry.Key, "expected same entry keys")
-		assert.Equal(t, entries[i].UserID, entry.UserID, "expected same user IDs")
-		assert.Equal(t, entries[i].Type, entry.Type, "expected same entry types")
-		assert.True(t, reflect.DeepEqual(entries[i].Meta, entry.Meta), "expected same entry meta")
-		assert.Equal(t, entries[i].Data, entry.Data, "expected same entry data")
-		assert.Equal(t, entries[i].Version, entry.Version, "expected same entry versions")
-		assert.NotEmpty(t, entry.CreatedAt, "expected non-empty created at")
-		assert.NotEmpty(t, entry.UpdatedAt, "expected non-empty created at")
-	}
-
-	// Delete + GetEntries
-	_, err = sut.Delete(ctx, entities.DeleteEntryRequest{
-		ID:     uuid.New(),
-		UserID: userID2,
-	})
-	require.ErrorIs(t, err, entities.ErrEntryNotFound, "expected entry not found error")
-	_, err = sut.Delete(ctx, entities.DeleteEntryRequest{
-		ID:     entries[0].ID,
-		UserID: userID2,
-	})
-	require.ErrorIs(t, err, entities.ErrEntryNotFound, "expected entry not found error")
-	del, err := sut.Delete(ctx, entities.DeleteEntryRequest{
-		ID:     entries[0].ID,
-		UserID: userID1,
-	})
-	require.NoError(t, err, "no error expected")
-	assert.Equal(t, del.ID.String(), getAll.Entries[0].ID.String(), "expected same entry IDs")
-	assert.Equal(t, del.Version, getAll.Entries[0].Version, "expected same entry versions")
-	entries = entries[1:]
-	getAll, err = sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
-	require.NoError(t, err, "no error expected")
-	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
-	for i, entry := range getAll.Entries {
-		assert.Equal(t, entries[i].Key, entry.Key, "expected same entry keys")
-		assert.Equal(t, entries[i].UserID, entry.UserID, "expected same user IDs")
-		assert.Equal(t, entries[i].Type, entry.Type, "expected same entry types")
-		assert.True(t, reflect.DeepEqual(entries[i].Meta, entry.Meta), "expected same entry meta")
-		assert.Equal(t, entries[i].Data, entry.Data, "expected same entry data")
-		assert.Equal(t, entries[i].Version, entry.Version, "expected same entry versions")
-		assert.Equal(t, entries[i].CreatedAt, entry.CreatedAt, "expected same entry created at")
-		assert.Equal(t, entries[i].UpdatedAt, entry.UpdatedAt, "expected same entry updated at")
-	}
-
-	// Update + Get
-	entries[0].Meta = map[string]string{"updated_test_key": "updated_test_value"}
-	entries[0].Data = []byte("updated_test_data")
-	updateRequest := entities.UpdateEntryRequest{
-		ID:      entries[0].ID,
-		UserID:  userID1,
-		Version: entries[0].Version,
-		Meta:    entries[0].Meta,
-		Data:    entries[0].Data,
-	}
-	updated, err := sut.Update(ctx, updateRequest)
-	require.NoError(t, err, "no error expected")
-	assert.Equal(t, entries[0].Version+1, updated.Version, "expected updated version")
-	entries[0].Version = updated.Version
-	get, err := sut.Get(ctx, entities.GetEntryRequest{ID: entries[0].ID, UserID: userID1})
-	require.NoError(t, err, "no error expected")
-	assert.Equal(t, get.Entry.ID.String(), updated.ID.String(), "expected same entry")
-	assert.Equal(t, get.Entry.Key, getAll.Entries[0].Key, "expected same entry keys")
-	assert.Equal(t, get.Entry.UserID.String(), getAll.Entries[0].UserID.String(), "expected same user IDs")
-	assert.Equal(t, get.Entry.Type, getAll.Entries[0].Type, "expected same entry types")
-	assert.True(t, reflect.DeepEqual(get.Entry.Meta, entries[0].Meta), "expected same entry meta")
-	assert.Equal(t, get.Entry.Data, entries[0].Data, "expected same entry data")
-	assert.Equal(t, get.Entry.Version, updated.Version, "expected same entry version")
-
-	// Update conflict resolving
-	updateEntry := *entries[0]
-	updateEntry.Meta = map[string]string{"updated_test_key_1": "updated_test_value_1"}
-	updateEntry.Data = []byte("updated_test_data_1")
-	updateRequest = entities.UpdateEntryRequest{
-		ID:      updateEntry.ID,
-		UserID:  userID1,
-		Version: updateEntry.Version + 10,
-		Meta:    updateEntry.Meta,
-		Data:    updateEntry.Data,
-	}
-	conflict, err := sut.Update(ctx, updateRequest)
-	require.NoError(t, err, "no error expected")
-	assert.Equal(t, int64(1), conflict.Version, "expected conflict version == 1")
-	assert.NotEqual(t, conflict.ID.String(), updateEntry.ID.String(), "expected conflict ID != entry ID")
-	get, err = sut.Get(ctx, entities.GetEntryRequest{ID: conflict.ID, UserID: userID1})
-	require.NoError(t, err, "no error expected")
-	assert.Equal(t, get.Entry.ID.String(), conflict.ID.String(), "expected same entry")
-	assert.NotEqual(t, get.Entry.Key, updateEntry.Key, "expected conflict key != entry key")
-	assert.True(t, strings.HasPrefix(get.Entry.Key, updateEntry.Key), "expected entry key prefix")
-	assert.Equal(t, get.Entry.UserID.String(), updateEntry.UserID.String(), "expected same user IDs")
-	assert.Equal(t, get.Entry.Type, updateEntry.Type, "expected same entry types")
-	assert.True(t, reflect.DeepEqual(get.Entry.Meta, updateEntry.Meta), "expected same entry meta")
-	assert.Equal(t, get.Entry.Data, updateEntry.Data, "expected same entry data")
-	assert.Equal(t, get.Entry.Version, conflict.Version, "expected same entry version")
-	getAll, err = sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
-	require.NoError(t, err, "no error expected")
-	require.NotEmpty(t, getAll.Entries, "expected non-empty list")
-	conflictIndex := slices.IndexFunc(getAll.Entries, func(e entities.Entry) bool { return e.ID == conflict.ID })
-	require.GreaterOrEqual(t, conflictIndex, 0, "expected conflict entry in list")
-	originIndex := slices.IndexFunc(getAll.Entries, func(e entities.Entry) bool { return e.ID == updateEntry.ID })
-	require.GreaterOrEqual(t, originIndex, 0, "expected origin entry in list")
-
-	// GetEntriesDiff
-	getAll, err = sut.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID1})
-	require.NoError(t, err, "no error expected")
-	versions := make([]core.EntryVersion, len(getAll.Entries))
-	for i, v := range getAll.Entries {
-		versions[i] = core.EntryVersion{ID: v.ID, Version: v.Version}
-	}
-	versions[len(versions)-1] = core.EntryVersion{ID: uuid.New(), Version: 1} // server does not have this entry
-	versions[0].Version = versions[0].Version + 10
-	getDiff, err := sut.GetEntriesDiff(ctx, entities.GetEntriesDiffRequest{UserID: userID1, Versions: versions})
-	require.NoError(t, err, "no error expected")
-	require.Len(t, getDiff.Entries, 2, "expected non-empty list")
-	require.Len(t, getDiff.CreateIDs, 1, "expected non-empty list")
-	require.Len(t, getDiff.UpdateIDs, 1, "expected non-empty list")
-	require.Len(t, getDiff.DeleteIDs, 1, "expected non-empty list")
-	require.Equal(t, getDiff.CreateIDs[0], getAll.Entries[len(getAll.Entries)-1].ID, "expected same entry")
-	require.Equal(t, getDiff.DeleteIDs[0], versions[len(versions)-1].ID, "expected same entry")
-	require.Equal(t, getDiff.UpdateIDs[0], versions[0].ID, "expected same entry")
-	require.True(t, slices.ContainsFunc(getDiff.Entries, func(entry entities.Entry) bool { return entry.ID == getDiff.UpdateIDs[0] }), "expected entry in list")
-	require.True(t, slices.ContainsFunc(getDiff.Entries, func(entry entities.Entry) bool { return entry.ID == getDiff.CreateIDs[0] }), "expected entry in list")
 }

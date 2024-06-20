@@ -75,15 +75,15 @@ func (uc *UserUC) SignUp(ctx context.Context, creds entities.Creds) (entities.To
 		PassHash: passHash,
 	})
 	if err != nil {
-		uc.logger.Error("failed to create user", zap.Error(err))
+		uc.logger.Error("failed to request user", zap.Error(err))
 		return emptyToken, err
 	}
 	if err := uc.userRepo.Create(ctx, *user); err != nil {
-		uc.logger.Error("failed to create user", zap.Error(err))
+		uc.logger.Error("failed to request user", zap.Error(err))
 	}
 	token, err := uc.tokener.Create(user.ID)
 	if err != nil {
-		uc.logger.Debug("failed to create token", zap.Error(err))
+		uc.logger.Debug("failed to request token", zap.Error(err))
 		return emptyToken, err
 	}
 	return token, nil
@@ -108,7 +108,7 @@ func (uc *UserUC) SignIn(
 	}
 	token, err := uc.tokener.Create(user.ID)
 	if err != nil {
-		uc.logger.Error("failed to create token", zap.Error(err))
+		uc.logger.Error("failed to request token", zap.Error(err))
 		return emptyToken, err
 	}
 

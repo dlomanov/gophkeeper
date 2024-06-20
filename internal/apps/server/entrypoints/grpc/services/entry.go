@@ -50,8 +50,13 @@ func (s *EntryService) Get(
 		s.logger.Debug("invalid entry id", zap.Error(err))
 		return nil, status.Error(codes.InvalidArgument, entities.ErrEntryIDInvalid.Error())
 	}
-
 	got, err := s.entryUC.Get(ctx, entities.GetEntryRequest{UserID: userID, ID: id})
+	if err != nil {
+		s.logger.Debug("failed to get entry",
+			zap.String("user_id", userID.String()),
+			zap.String("entry_id", id.String()),
+			zap.Error(err))
+	}
 	var (
 		invalid  *apperrors.AppErrorInvalid
 		notFound *apperrors.AppErrorNotFound
@@ -83,6 +88,11 @@ func (s *EntryService) GetAll(
 	}
 
 	got, err := s.entryUC.GetEntries(ctx, entities.GetEntriesRequest{UserID: userID})
+	if err != nil {
+		s.logger.Debug("failed to get entries",
+			zap.Error(err),
+			zap.String("user_id", userID.String()))
+	}
 	var (
 		invalid *apperrors.AppErrorInvalid
 	)
@@ -91,8 +101,8 @@ func (s *EntryService) GetAll(
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	case err != nil:
 		s.logger.Error("failed to get entries",
-			zap.String("user_id", userID.String()),
-			zap.Error(err))
+			zap.Error(err),
+			zap.String("user_id", userID.String()))
 		return nil, status.Error(codes.Internal, "internal server error")
 	}
 
@@ -118,8 +128,7 @@ func (s *EntryService) GetDiff(
 		UserID:   userID,
 		Versions: versions,
 	})
-	switch {
-	case err != nil:
+	if err != nil {
 		s.logger.Error("failed to get entries diff",
 			zap.String("user_id", userID.String()),
 			zap.Error(err))
@@ -169,6 +178,11 @@ func (s *EntryService) Create(
 		Meta:   request.Meta,
 		Data:   request.Data,
 	})
+	if err != nil {
+		s.logger.Debug("failed to create entry",
+			zap.Error(err),
+			zap.String("user_id", userID.String()))
+	}
 	var (
 		invalid  *apperrors.AppErrorInvalid
 		conflict *apperrors.AppErrorConflict
@@ -208,6 +222,12 @@ func (s *EntryService) Update(
 		Data:    request.Data,
 		Version: request.Version,
 	})
+	if err != nil {
+		s.logger.Debug("failed to update entry",
+			zap.String("user_id", userID.String()),
+			zap.String("entry_id", request.Id),
+			zap.Error(err))
+	}
 	var (
 		invalid  *apperrors.AppErrorInvalid
 		notFound *apperrors.AppErrorNotFound
@@ -245,6 +265,12 @@ func (s *EntryService) Delete(
 		ID:     s.parseUUID(request.Id),
 		UserID: userID,
 	})
+	if err != nil {
+		s.logger.Debug("failed to update entry",
+			zap.String("user_id", userID.String()),
+			zap.String("entry_id", request.Id),
+			zap.Error(err))
+	}
 	var (
 		invalid  *apperrors.AppErrorInvalid
 		notFound *apperrors.AppErrorNotFound
