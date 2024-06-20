@@ -41,11 +41,11 @@ func (uc *UserUC) SignUp(
 	})
 	switch {
 	case status.Code(err) == codes.AlreadyExists:
-		return entities.ErrUserExists
+		return fmt.Errorf("user_sign_up: %w: %w", entities.ErrUserExists, err)
 	case status.Code(err) == codes.InvalidArgument:
-		return entities.ErrUserCredsInvalid
+		return fmt.Errorf("user_sign_up: %w: %w", entities.ErrUserCredsInvalid, err)
 	case err != nil:
-		return fmt.Errorf("user_sign_up: internal server error: %w", err)
+		return fmt.Errorf("user_sign_up: %w: %w", entities.ErrServerInternal, err)
 	}
 	uc.cache.SetString("login", request.Login)
 	uc.cache.SetString("token", resp.Token)
@@ -62,11 +62,11 @@ func (uc *UserUC) SignIn(
 	})
 	switch {
 	case status.Code(err) == codes.InvalidArgument:
-		return fmt.Errorf("user_sign_up: invalid argument: %w", err)
+		return fmt.Errorf("user_sign_in: %w: %w", entities.ErrUserCredsInvalid, err)
 	case status.Code(err) == codes.Unauthenticated:
-		return fmt.Errorf("user_sign_up: unauthenticated: %w", err)
+		return fmt.Errorf("user_sign_in: %w: %w", entities.ErrUserCredsInvalid, err)
 	case err != nil:
-		return fmt.Errorf("user_sign_up: internal server error: %w", err)
+		return fmt.Errorf("user_sign_in: %w: %w", entities.ErrServerInternal, err)
 	}
 	uc.cache.SetString("login", request.Login)
 	uc.cache.SetString("token", resp.Token)

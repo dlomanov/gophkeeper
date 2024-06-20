@@ -129,12 +129,13 @@ func (uc *EntryUC) Create(
 		uc.logger.Error("failed to encrypt entry data", zap.Error(err))
 		return response, fmt.Errorf("entry_usecase: failed to encrypt entry data: %w", err)
 	}
-	entry, err := entities.NewEntry(request.Key, request.Type, encrypted)
+	entry, err := entities.NewEntry(request.Key, request.Type, data)
 	if err != nil {
 		uc.logger.Error("failed to encrypt entry data", zap.Error(err))
 		return response, fmt.Errorf("entry_usecase: %w", err)
 	}
 	entry.Meta = request.Meta
+	entry.Data = encrypted
 	if err = uc.tx.Do(ctx, func(ctx context.Context) error {
 		err = uc.entryRepo.Create(ctx, *entry)
 		switch {
@@ -182,9 +183,10 @@ func (uc *EntryUC) Update(
 		}
 		if err = entry.Update(
 			entities.UpdateEntryMeta(request.Meta),
-			entities.UpdateEntryData(encrypted)); err != nil {
+			entities.UpdateEntryData(data)); err != nil {
 			return fmt.Errorf("entry_usecase: %w", err)
 		}
+		entry.Data = encrypted
 		if err = uc.entryRepo.Update(ctx, entry); err != nil {
 			return fmt.Errorf("entry_usecase: failed to update entry in repo: %w", err)
 		}

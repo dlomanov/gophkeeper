@@ -42,7 +42,7 @@ func (s *TestUserAuthUC) TearDownSuite() {
 	require.NoError(s.T(), err, "failed to close database")
 }
 
-func Test(t *testing.T) {
+func TestUserAuthUCRun(t *testing.T) {
 	suite.Run(t, new(TestUserAuthUC))
 }
 

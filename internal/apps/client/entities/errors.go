@@ -19,6 +19,7 @@ var (
 	ErrUserTokenInvalid      = apperrors.NewInvalid("token is invalid")
 	ErrUserMasterPassInvalid = apperrors.NewInvalid("master password is invalid")
 	ErrKVPairNotFound        = apperrors.NewNotFound("key-value pair not found")
+	ErrServerInternal        = apperrors.NewInternal("internal server error")
 	ErrServerUnavailable     = apperrors.NewInternal("server unavailable")
 	ErrEntryDataTypeInvalid  = apperrors.NewInvalid("invalid entry data type")
 )

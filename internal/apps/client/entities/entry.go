@@ -137,10 +137,9 @@ type (
 		ID uuid.UUID
 	}
 	UpdateEntryRequest struct {
-		ID      uuid.UUID ``
-		Meta    map[string]string
-		Data    EntryData
-		Version int64
+		ID   uuid.UUID ``
+		Meta map[string]string
+		Data EntryData
 	}
 	DeleteEntryRequest struct {
 		ID uuid.UUID
