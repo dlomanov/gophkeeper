@@ -11,6 +11,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base/input"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base/styles"
 	"github.com/dlomanov/gophkeeper/internal/core"
+	"go.uber.org/zap"
 	"strings"
 	"time"
 )
@@ -156,6 +157,7 @@ func (c *Main) authCmd(pass string) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Second)
 		defer cancel()
 		if err := c.container.Register(ctx, core.Pass(pass)); err != nil {
+			c.container.Logger.Error("failed to register dependencies", zap.Error(err))
 			return authMsg{err: fmt.Errorf("main: failed to auth user and register dependencies: %w", err)}
 		}
 		return authMsg{err: nil}

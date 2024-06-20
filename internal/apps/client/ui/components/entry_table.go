@@ -47,8 +47,8 @@ type (
 
 func NewEntryTable(
 	title string,
-	entryUC EntryUC,
 	logger *zap.Logger,
+	entryUC EntryUC,
 ) *EntryTable {
 	c := &EntryTable{
 		title:   title,
@@ -256,6 +256,7 @@ func (c *EntryTable) syncCmd() tea.Cmd {
 		}
 		resp, err := c.entryUC.GetAll(ctx)
 		if err != nil {
+			c.logger.Error("failed to get entries", zap.Error(err))
 			merr = errors.Join(merr, err)
 			return syncMsg{err: merr}
 		}
@@ -282,6 +283,7 @@ func (c *EntryTable) entryCreateSelector(
 ) base.UpdateResult {
 	result.Next = NewEntryCreateSelector(
 		c.title+"/create",
+		c.logger,
 		c,
 		c.entryUC,
 	)
@@ -294,13 +296,13 @@ func (c *EntryTable) entryUpdate(
 	title := c.title + "/update"
 	switch entry.Type {
 	case core.EntryTypePassword:
-		result.Next = NewEntryUpdatePassword(title, c, c.entryUC, entry)
+		result.Next = NewEntryUpdatePassword(title, c.logger, c, c.entryUC, entry)
 	case core.EntryTypeNote:
-		result.Next = NewEntryUpdateNote(title, c, c.entryUC, entry)
+		result.Next = NewEntryUpdateNote(title, c.logger, c, c.entryUC, entry)
 	case core.EntryTypeCard:
-		result.Next = NewEntryUpdateCard(title, c, c.entryUC, entry)
+		result.Next = NewEntryUpdateCard(title, c.logger, c, c.entryUC, entry)
 	case core.EntryTypeBinary:
-		result.Next = NewEntryUpdateBinary(title, c, c.entryUC, entry)
+		result.Next = NewEntryUpdateBinary(title, c.logger, c, c.entryUC, entry)
 	}
 	return result
 }

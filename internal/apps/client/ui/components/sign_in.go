@@ -10,6 +10,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base/styles"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
+	"go.uber.org/zap"
 	"strings"
 	"time"
 )
@@ -18,6 +19,7 @@ var _ base.Component = (*SignIn)(nil)
 
 type (
 	SignIn struct {
+		logger     *zap.Logger
 		userUC     *usecases.UserUC
 		cache      *mem.Cache
 		title      string
@@ -33,11 +35,13 @@ type (
 
 func NewSignIn(
 	title string,
+	logger *zap.Logger,
 	userUC *usecases.UserUC,
 	cache *mem.Cache,
 ) *SignIn {
 	c := &SignIn{
 		title:  title,
+		logger: logger,
 		back:   nil,
 		userUC: userUC,
 		cache:  cache,

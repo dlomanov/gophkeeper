@@ -6,6 +6,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base/navlist"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base/styles"
 	"github.com/dlomanov/gophkeeper/internal/core"
+	"go.uber.org/zap"
 	"strings"
 )
 
@@ -13,39 +14,42 @@ var _ base.Component = (*EntryCreateSelector)(nil)
 
 type (
 	EntryCreateSelector struct {
-		title string
-		back  base.Component
-		list  navlist.List
+		title  string
+		back   base.Component
+		list   navlist.List
+		logger *zap.Logger
 	}
 )
 
 func NewEntryCreateSelector(
 	title string,
+	logger *zap.Logger,
 	back base.Component,
 	entryUC EntryCreateUC,
 ) *EntryCreateSelector {
 	l := navlist.New([]navlist.Item{
 		{
 			Name: string(core.EntryTypePassword),
-			Next: NewEntryCreatePassword(title, back, entryUC),
+			Next: NewEntryCreatePassword(title, logger, back, entryUC),
 		},
 		{
 			Name: string(core.EntryTypeNote),
-			Next: NewEntryCreateNote(title, back, entryUC),
+			Next: NewEntryCreateNote(title, logger, back, entryUC),
 		},
 		{
 			Name: string(core.EntryTypeCard),
-			Next: NewEntryCreateCard(title, back, entryUC),
+			Next: NewEntryCreateCard(title, logger, back, entryUC),
 		},
 		{
 			Name: string(core.EntryTypeBinary),
-			Next: NewEntryCreateBinary(title, back, entryUC),
+			Next: NewEntryCreateBinary(title, logger, back, entryUC),
 		},
 	})
 	c := &EntryCreateSelector{
-		title: title,
-		back:  back,
-		list:  l,
+		title:  title,
+		logger: logger,
+		back:   back,
+		list:   l,
 	}
 	return c
 }

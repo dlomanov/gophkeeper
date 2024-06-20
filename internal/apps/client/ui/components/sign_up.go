@@ -10,6 +10,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base/styles"
 	"github.com/dlomanov/gophkeeper/internal/apps/client/usecases"
+	"go.uber.org/zap"
 	"strings"
 	"time"
 )
@@ -24,6 +25,7 @@ type (
 		back       base.Component
 		inputs     []textinput.Model
 		focusIndex int
+		logger     *zap.Logger
 	}
 	signUpMsg struct {
 		token string
@@ -33,11 +35,13 @@ type (
 
 func NewSignUp(
 	title string,
+	logger *zap.Logger,
 	userUC *usecases.UserUC,
 	cache *mem.Cache,
 ) *SignUp {
 	c := &SignUp{
 		title:  title,
+		logger: logger,
 		back:   nil,
 		userUC: userUC,
 		cache:  cache,

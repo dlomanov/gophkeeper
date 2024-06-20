@@ -50,20 +50,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = tea.Batch(cmds, res.Cmd)
 	if res.PassAccepted && !m.accepted {
 		m.accepted = true
-		table := components.NewEntryTable("gophkeeper/entries", m.c.EntryUC, m.c.Logger)
-		signUp := components.NewSignUp("gophkeeper/sync/sign-up", m.c.UserUC, m.c.Memcache)
-		signIn := components.NewSignIn("gophkeeper/sync/sign-in", m.c.UserUC, m.c.Memcache)
+		table := components.NewEntryTable("gophkeeper/entries", m.c.Logger, m.c.EntryUC)
+		signUp := components.NewSignUp("gophkeeper/sync/sign-up", m.c.Logger, m.c.UserUC, m.c.Memcache)
+		signIn := components.NewSignIn("gophkeeper/sync/sign-in", m.c.Logger, m.c.UserUC, m.c.Memcache)
 		about := components.NewSettings("gophkeeper/about", components.BuildInfo{
 			Version: m.c.Config.BuildVersion,
 			Date:    m.c.Config.BuildDate,
 			Commit:  m.c.Config.BuildCommit,
 		})
-		menu := components.NewMenu("gophkeeper", []navlist.Item{
-			{Name: "Sign-up", Next: signUp},
-			{Name: "Sign-in", Next: signIn},
-			{Name: "Entries", Next: table},
-			{Name: "About", Next: about},
-		})
+		menu := components.NewMenu("gophkeeper",
+			[]navlist.Item{
+				{Name: "Sign-up", Next: signUp},
+				{Name: "Sign-in", Next: signIn},
+				{Name: "Entries", Next: table},
+				{Name: "About", Next: about},
+			})
 		table.SetPrev(menu)
 		signUp.SetPrev(menu)
 		signIn.SetPrev(menu)

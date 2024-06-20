@@ -11,6 +11,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base/styles"
 	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"os"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 type (
 	EntryUpdate struct {
 		title      string
+		logger     *zap.Logger
 		back       base.Component
 		focusIndex int
 		syncing    bool
@@ -46,6 +48,7 @@ type (
 
 func NewEntryUpdatePassword(
 	title string,
+	logger *zap.Logger,
 	back base.Component,
 	entryUC EntryUpdateUC,
 	entry entities.GetEntryResponse,
@@ -62,6 +65,7 @@ func NewEntryUpdatePassword(
 	inputs[descIndex] = input.NewArea("description", 280)
 	return &EntryUpdate{
 		title:      title,
+		logger:     logger,
 		back:       back,
 		focusIndex: 0,
 
@@ -98,6 +102,7 @@ func NewEntryUpdatePassword(
 
 func NewEntryUpdateCard(
 	title string,
+	logger *zap.Logger,
 	back base.Component,
 	entryUC EntryUpdateUC,
 	entry entities.GetEntryResponse,
@@ -118,6 +123,7 @@ func NewEntryUpdateCard(
 	inputs[descIndex] = input.NewArea("description", 280)
 	return &EntryUpdate{
 		title:      title,
+		logger:     logger,
 		back:       back,
 		focusIndex: 0,
 
@@ -155,6 +161,7 @@ func NewEntryUpdateCard(
 
 func NewEntryUpdateNote(
 	title string,
+	logger *zap.Logger,
 	back base.Component,
 	entryUC EntryUpdateUC,
 	entry entities.GetEntryResponse,
@@ -167,6 +174,7 @@ func NewEntryUpdateNote(
 	inputs[noteIndex] = input.NewArea("note", 280)
 	return &EntryUpdate{
 		title:      title,
+		logger:     logger,
 		back:       back,
 		focusIndex: 0,
 
@@ -195,6 +203,7 @@ func NewEntryUpdateNote(
 
 func NewEntryUpdateBinary(
 	title string,
+	logger *zap.Logger,
 	back base.Component,
 	entryUC EntryUpdateUC,
 	entry entities.GetEntryResponse,
@@ -209,6 +218,7 @@ func NewEntryUpdateBinary(
 	inputs[descIndex] = input.NewArea("description", 280)
 	return &EntryUpdate{
 		title:      title,
+		logger:     logger,
 		back:       back,
 		focusIndex: 0,
 
@@ -386,11 +396,13 @@ func (c *EntryUpdate) entryUpdateCmd() tea.Cmd {
 	return func() tea.Msg {
 		request, err := c.requester(c.inputs)
 		if err != nil {
+			c.logger.Error("failed to create entry request", zap.Error(err))
 			return entryUpdateMsg{err: err}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err = c.entryUC.Update(ctx, request); err != nil {
+			c.logger.Error("failed to update entry", zap.Error(err))
 			return entryUpdateMsg{err: err}
 		}
 		return entryUpdateMsg{
@@ -404,14 +416,17 @@ func (c *EntryUpdate) downloadBinaryCmd() tea.Cmd {
 		entry := c.entry
 		filename := entry.Meta["filename"]
 		if filename == "" {
+			c.logger.Error("filename is empty")
 			return binaryDownloadMsg{err: errors.New("filename is empty")}
 		}
 		filepath := "./downloads/" + filename
 		data := entry.Data.(entities.EntryDataBinary)
 		if err := os.MkdirAll("./downloads", 0755); err != nil {
+			c.logger.Error("failed to create downloads directory", zap.Error(err))
 			return binaryDownloadMsg{err: err}
 		}
 		if err := os.WriteFile(filepath, data, 0644); err != nil {
+			c.logger.Error("failed to write file", zap.Error(err))
 			return binaryDownloadMsg{err: err}
 		}
 		return binaryDownloadMsg{

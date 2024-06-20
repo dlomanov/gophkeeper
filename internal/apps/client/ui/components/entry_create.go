@@ -11,6 +11,7 @@ import (
 	"github.com/dlomanov/gophkeeper/internal/apps/client/ui/components/base/styles"
 	"github.com/dlomanov/gophkeeper/internal/core"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +30,7 @@ type (
 		entryType core.EntryType
 		validator func([]input.Input) error
 		requester func([]input.Input) (entities.CreateEntryRequest, error)
+		logger    *zap.Logger
 	}
 	EntryCreateUC interface {
 		Create(ctx context.Context, request entities.CreateEntryRequest) (entities.CreateEntryResponse, error)
@@ -42,6 +44,7 @@ type (
 
 func NewEntryCreatePassword(
 	title string,
+	logger *zap.Logger,
 	back base.Component,
 	entryUC EntryCreateUC,
 ) *EntryCreate {
@@ -60,6 +63,7 @@ func NewEntryCreatePassword(
 	inputs[descIndex] = input.NewArea("description", 280)
 	return &EntryCreate{
 		title:      fmt.Sprintf("%s/%s", title, typ),
+		logger:     logger,
 		back:       back,
 		focusIndex: 0,
 
@@ -94,6 +98,7 @@ func NewEntryCreatePassword(
 
 func NewEntryCreateCard(
 	title string,
+	logger *zap.Logger,
 	back base.Component,
 	entryUC EntryCreateUC,
 ) *EntryCreate {
@@ -116,6 +121,7 @@ func NewEntryCreateCard(
 	inputs[descIndex] = input.NewArea("description", 280)
 	return &EntryCreate{
 		title:      fmt.Sprintf("%s/%s", title, typ),
+		logger:     logger,
 		back:       back,
 		focusIndex: 0,
 
@@ -149,6 +155,7 @@ func NewEntryCreateCard(
 
 func NewEntryCreateNote(
 	title string,
+	logger *zap.Logger,
 	back base.Component,
 	entryUC EntryCreateUC,
 ) *EntryCreate {
@@ -163,6 +170,7 @@ func NewEntryCreateNote(
 	inputs[noteIndex] = input.NewArea("note", 280)
 	return &EntryCreate{
 		title:      fmt.Sprintf("%s/%s", title, typ),
+		logger:     logger,
 		back:       back,
 		focusIndex: 0,
 
@@ -191,6 +199,7 @@ func NewEntryCreateNote(
 
 func NewEntryCreateBinary(
 	title string,
+	logger *zap.Logger,
 	back base.Component,
 	entryUC EntryCreateUC,
 ) *EntryCreate {
@@ -207,6 +216,7 @@ func NewEntryCreateBinary(
 	inputs[descIndex] = input.NewArea("description", 280)
 	return &EntryCreate{
 		title:      fmt.Sprintf("%s/%s", title, typ),
+		logger:     logger,
 		back:       back,
 		focusIndex: 0,
 
@@ -226,16 +236,20 @@ func NewEntryCreateBinary(
 			path := inputs[pathIndex].Value()
 			fileInfo, err := os.Stat(path)
 			if err != nil {
+				logger.Error("failed to get file info", zap.Error(err))
 				return request, fmt.Errorf("failed to get file info: %w", err)
 			}
 			if fileInfo.IsDir() {
+				logger.Error("path must be a file", zap.String("path", path))
 				return request, fmt.Errorf("path must be a file")
 			}
 			if fileInfo.Size() > entities.EntryMaxDataSize {
+				logger.Error("file size must be less than 1MB", zap.String("path", path))
 				return request, fmt.Errorf("file size must be less than %d bytes", entities.EntryMaxDataSize)
 			}
 			data, err := os.ReadFile(path)
 			if err != nil {
+				logger.Error("failed to read file", zap.Error(err))
 				return request, fmt.Errorf("failed to read file: %w", err)
 			}
 			name := filepath.Base(path)
@@ -379,12 +393,14 @@ func (c *EntryCreate) entryCreateCmd() tea.Cmd {
 	return func() tea.Msg {
 		request, err := c.requester(c.inputs)
 		if err != nil {
+			c.logger.Error("failed to create entry request", zap.Error(err))
 			return entryCreateMsg{err: err}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		resp, err := c.entryUC.Create(ctx, request)
 		if err != nil {
+			c.logger.Error("failed to create entry", zap.Error(err))
 			return entryCreateMsg{err: err}
 		}
 		return entryCreateMsg{
