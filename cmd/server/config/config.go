@@ -102,10 +102,10 @@ func (c *config) readEnv() {
 }
 
 func (c config) print() {
-	c.TokenSecretKey = "**********"
-	c.DataSecretKey = "**********"
-	c.CertPath = "**********"
-	c.CertKeyPath = "**********"
+	//c.TokenSecretKey = "**********"
+	//c.DataSecretKey = "**********"
+	//c.CertPath = "**********"
+	//c.CertKeyPath = "**********"
 	content, err := yaml.Marshal(c)
 	if err != nil {
 		log.Fatalf("failed to print config: %v", err)
