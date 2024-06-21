@@ -23,3 +23,11 @@ go.work
 # IDEs directories
 .idea
 .vscode
+
+# Logs
+*.log
+
+# App settigns
+*.db
+/cmd/client/downloads
+!/cmd/client/builds/*.exe

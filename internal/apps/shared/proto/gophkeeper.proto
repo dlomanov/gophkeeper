@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/dlomanov/gophkeeper/internal/apps/shared/proto";
+
+service UserService {
+  rpc SignUp (SignUpUserRequest) returns (SignUpUserResponse);
+  rpc SignIn (SignInUserRequest) returns (SignInUserResponse);
+}
+
+message SignUpUserRequest {
+  string login = 1;
+  string password = 2;
+}
+
+message SignUpUserResponse {
+  string token = 1;
+}
+
+message SignInUserRequest {
+  string login = 1;
+  string password = 2;
+}
+
+message SignInUserResponse {
+  string token = 1;
+}
+
+
+service EntryService {
+  rpc Get (GetEntryRequest) returns (GetEntryResponse);
+  rpc GetAll (GetEntriesRequest) returns (GetEntriesResponse);
+  rpc GetDiff (GetEntriesDiffRequest) returns (GetEntriesDiffResponse);
+  rpc Create (CreateEntryRequest) returns (CreateEntryResponse);
+  rpc Update (UpdateEntryRequest) returns (UpdateEntryResponse);
+  rpc Delete (DeleteEntryRequest) returns (DeleteEntryResponse);
+}
+
+message GetEntriesRequest {
+}
+
+message GetEntriesResponse {
+  repeated Entry entries = 1;
+}
+
+message GetEntriesDiffRequest {
+  repeated EntryVersion versions = 1;
+}
+
+message GetEntriesDiffResponse {
+  repeated Entry entries = 1;
+  repeated string createIds = 2;
+  repeated string updateIds = 3;
+  repeated string deleteIds = 4;
+}
+
+message GetEntryRequest {
+  string id = 1;
+}
+
+message GetEntryResponse {
+  optional Entry entry = 1;
+}
+
+message CreateEntryRequest {
+  string key = 1;
+  EntryType type = 2;
+  map<string, string> meta = 3;
+  bytes data = 4;
+}
+
+message CreateEntryResponse {
+  string id = 1;
+  int64 version = 2;
+}
+
+message UpdateEntryRequest {
+  string id = 1;
+  int64 version = 2;
+  map<string, string> meta = 3;
+  bytes data = 4;
+}
+
+message UpdateEntryResponse {
+  string id = 1;
+  int64 version = 2;
+}
+
+message DeleteEntryRequest {
+  string id = 1;
+}
+
+message DeleteEntryResponse {
+  string id = 1;
+  int64 version = 2;
+}
+
+message Entry {
+  string id = 1;
+  string key = 2;
+  EntryType type = 3;
+  map<string, string> meta = 4;
+  bytes data = 5;
+  int64 version = 6;
+}
+
+message EntryVersion {
+  string id = 1;
+  int64 version = 2;
+}
+
+enum EntryType {
+    ENTRY_TYPE_UNSPECIFIED = 0;
+    ENTRY_TYPE_PASSWORD = 1;
+    ENTRY_TYPE_NOTE = 2;
+    ENTRY_TYPE_CARD = 3;
+    ENTRY_TYPE_BINARY = 4;
+}

@@ -1,1 +1,7 @@
 address: ":9090"
+config_path: "config.yaml"
+log_level: "debug"
+log_type: "development"
+log_output_paths: "logs.log"
+cert_path: ""
+dsn: "file:gophkeeper.db?_journal_mode=WAL&_foreign_keys=1&_busy_timeout=5000"
